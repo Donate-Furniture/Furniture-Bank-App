@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// 1. GENERATOR: Configures the Prisma Client (the type-safe library we will use to query the database)
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 2. DATASOURCE: Connects to your PostgreSQL database using the URI in .env.local
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------
+// CORE MODELS
+// ------------------------------------------------
+
+// The User Model: Stores all user information
+model User {
+  // Primary Key and Unique Identifier
+  id        String   @id @default(uuid()) // Automatically generates a unique ID (UUID)
+  
+  // Credentials (Used for Authentication)
+  email     String   @unique // MUST be unique for login purposes
+  password  String   // Stores the HASHED password (never plain text)
+
+  // Profile Information
+  name      String
+  location  String? // Optional field: Location/City for local trade matching
+
+  // Timestamps
+  createdAt DateTime @default(now()) // Timestamp when the user was created
+  updatedAt DateTime @updatedAt // Timestamp automatically updated on every change
+
+  // Relationships: These link the user to other tables (no column created here)
+  listings  Listing[] // A list of listings posted by this user
+  
+  @@map("users") // Sets the physical table name in PostgreSQL
+}
+
+// The Listing Model: Stores furniture item details
+model Listing {
+  id              String    @id @default(uuid())
+  
+  // Core Item Details
+  title           String    @db.VarChar(255)
+  description     String
+  category        String    // e.g., 'Sofa', 'Table', 'Chair'
+  price           Float?    // Price if selling (optional)
+  status          String    @default("available") // 'available', 'pending', 'sold/taken'
+  
+  // Location and Images
+  city            String
+  zipCode         String?
+  // NOTE: Images are stored as URLs in an array of strings, not the image data itself
+  imageUrls       String[]  
+  
+  // Relationship to the User table (Foreign Key)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id]) // Links to the User model
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("listings")
+}
