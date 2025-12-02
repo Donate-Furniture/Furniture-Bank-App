@@ -26,7 +26,8 @@ model User {
   password  String   // Stores the HASHED password (never plain text)
 
   // Profile Information
-  name      String
+  firstName String
+  lastName  String
   location  String? // Optional field: Location/City for local trade matching
 
   // Timestamps
