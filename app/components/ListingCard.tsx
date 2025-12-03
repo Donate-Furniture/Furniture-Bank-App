@@ -29,7 +29,7 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
  return (
     // Wrap the entire card in a Link component using the listing ID
     <Link href={`/listings/${listing.id}`} passHref legacyBehavior>
-      <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden border border-gray-100 cursor-pointer">
+      <div className="bg-card-bg rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden border border-gray-100 cursor-pointer">
         
         {/* Image Container */}
         <div className="relative h-48 w-full bg-gray-200">
@@ -65,7 +65,7 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
           {/* Location & Post Date */}
           <p className="text-sm text-gray-600 mb-3 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 0110.9 0L14.7 4.7a5 5 0 00-8.4 0L5.05 4.05zM4 6.7a9 9 0 0112 0l-1 1a7 7 0 00-10 0l-1-1zM3 9.3a11 11 0 0114 0l-1 1a9 9 0 00-12 0l-1-1zM2 12a13 13 0 0116 0l-1 1a11 11 0 00-14 0l-1-1zM1 14.7a15 15 0 0118 0l-1 1a13 13 0 00-16 0l-1-1z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 019.9 0 7 7 0 010 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
               {listing.city}
           </p>
