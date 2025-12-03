@@ -32,7 +32,6 @@ export default function Home() {
           <h2 className="text-2xl font-semibold text-gray-800 mb-2">
             Welcome back, {user.firstName}!
           </h2>
-          <p className="text-gray-500 mb-6">{user.email}</p>
 
           <button
             onClick={logout}
@@ -46,14 +45,7 @@ export default function Home() {
           <p className="text-lg text-gray-600 mb-4">
             Join the community to trade furniture securely.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/auth"
-              className="bg-indigo-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-            >
-              Log In / Register
-            </Link>
-          </div>
+          
         </div>
       )}
     </div>

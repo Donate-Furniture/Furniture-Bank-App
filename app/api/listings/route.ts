@@ -65,7 +65,46 @@ export async function POST(request: NextRequest) {
     }
 }
 
+// -------------------------------------------------------------------------
+// GET method handler for fetching all listings
+// -------------------------------------------------------------------------
+
+export async function GET(request: NextRequest) {
+    try {
+        // NOTE: We are NOT requiring authentication for viewing listings (public data)
+        
+        // Fetch all listings from the database, ordering by creation date (newest first)
+        const listings = await prisma.listing.findMany({
+            orderBy: {
+                createdAt: 'desc',
+            },
+            // Include the user data (firstName, lastName) via the relationship
+            include: {
+                user: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        location: true,
+                    }
+                }
+            }
+        });
+
+        return NextResponse.json(
+            { listings },
+            { status: 200 }
+        );
+
+    } catch (error) {
+        console.error('Error fetching listings:', error);
+        return NextResponse.json(
+            { error: 'An unexpected server error occurred while fetching listings.' },
+            { status: 500 }
+        );
+    }
+}
+
 // ----------------------------------------------------
-// NOTE: We do not define GET, PUT, or DELETE here yet.
+// NOTE: We do not define PUT, or DELETE here yet.
 // Those will be added later when we build the search/filter features.
 // ----------------------------------------------------

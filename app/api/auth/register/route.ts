@@ -6,10 +6,10 @@ import prisma from '@/lib/prisma';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // CHANGE: Destructure firstName and lastName instead of name
+    // User parameters
     const { email, password, firstName, lastName, location } = body;
 
-    // CHANGE: Update validation
+    // validation
     if (!email || !password || !firstName || !lastName) {
       return NextResponse.json(
         { error: 'Missing required fields: email, password, first name, and last name are required.' },
@@ -34,7 +34,6 @@ export async function POST(request: Request) {
       data: {
         email: email.toLowerCase(),
         password: hashedPassword,
-        // CHANGE: Save separate fields
         firstName,
         lastName,
         location: location || null,
@@ -49,7 +48,6 @@ export async function POST(request: Request) {
         user: {
           id: newUser.id,
           email: newUser.email,
-          // CHANGE: Return separate fields
           firstName: newUser.firstName,
           lastName: newUser.lastName,
           location: newUser.location,

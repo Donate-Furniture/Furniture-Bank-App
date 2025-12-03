@@ -1,17 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
-//This file creates a single source of truth for the user's login status (isLoggedIn, user, token). Any React component 
-// (like a header or a protected form) can now simply call const { user, logout } = useAuth(); to access the state.
+//The purpose of the AuthContext.tsx file is to serve as a single source of truth for your user's authentication 
+// status across your entire frontend application.
 
 
 // --- 1. Define Types ---
 
-// The structure of the user object we store on the frontend
 interface User {
   id: string;
   email: string;
-  firstName: string; // Updated
-  lastName: string;  // Updated
+  firstName: string;
+  lastName: string;
   location: string | null;
 }
 
@@ -22,6 +21,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  // FIX: Added isAuthenticated to the interface
+  isAuthenticated: boolean; 
 }
 
 // --- 2. Create Context and Initial State ---
@@ -74,20 +75,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // --- Initial Load Effect (Checks for Token on Startup) ---
   useEffect(() => {
-    // This runs once when the app loads to check if the user is already logged in
     const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
     
     if (storedToken) {
-        // NOTE: In a full app, you would verify this token with an API call (e.g., GET /api/auth/me).
-        // For simplicity in this MVP, we rely on the token being present.
         setToken(storedToken);
-        
-        // **IMPORTANT:** Since the user data (name, email) isn't in the JWT, 
-        // we'd need to fetch it here using the token, but we defer that fetch 
-        // to keep the boilerplate simple. Assume token presence means logged in.
     }
     setIsLoading(false);
   }, []);
+  
+  // Computed property: isAuthenticated
+  const isAuthenticated = !!user && !!token;
 
   const contextValue: AuthContextType = {
     user,
@@ -95,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
+    isAuthenticated, // Added to the context value
   };
 
   return (

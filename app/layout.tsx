@@ -1,17 +1,18 @@
-import './globals.css'; // Import global styles (Tailwind CSS will live here)
+import './globals.css'; // Import global styles
 import { Inter } from 'next/font/google'; 
-import AuthWrapper from '@/app/components/AuthWrapper'; // Import the Client Component wrapper we created
+import AuthWrapper from '@/app/components/AuthWrapper'; // Import our client-side wrapper
+import Navbar from '@/app/components/Navbar'; 
 import React from 'react';
 
 const inter = Inter({ subsets: ['latin'] });
 
-// Define Metadata for SEO
+// Define standard metadata for the application
 export const metadata = {
   title: 'Furniture Exchange MVP',
   description: 'Community platform for exchanging, donating, and selling used furniture.',
 };
 
-// The Root Layout Component (Server Component)
+// The Root Layout (Server Component)
 export default function RootLayout({
   children,
 }: {
@@ -20,15 +21,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        {/* 
-           The AuthWrapper is a Client Component that holds the AuthProvider.
-           Wrapping 'children' here means the entire app has access to useAuth().
-        */}
         <AuthWrapper>
-          <main className="min-h-screen flex flex-col">
-             {/* We will add a Navbar here later */}
-            {children}
-          </main>
+          <div className="min-h-screen flex flex-col bg-gray-50">
+
+            <Navbar /> 
+            
+            <main className="flex-grow">
+              {children}
+            </main>
+          </div>
         </AuthWrapper>
       </body>
     </html>

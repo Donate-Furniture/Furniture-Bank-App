@@ -22,7 +22,9 @@ export interface AuthenticatedRequest extends NextRequest {
     user?: {
         id: string;
         email: string;
-        name: string;
+        //firstName: string;
+        //lastName: string;
+
     }
 }
 
@@ -62,7 +64,7 @@ export async function authenticate(req: NextRequest): Promise<[AuthenticatedRequ
     // We verify the userId from the payload actually corresponds to an active user.
     const user = await prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { id: true, email: true, name: true } // Only select non-sensitive fields
+        select: { id: true, email: true } 
     });
 
     if (!user) {
