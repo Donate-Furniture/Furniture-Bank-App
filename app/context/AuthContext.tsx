@@ -1,18 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-
+import { User } from '@/lib/types';
 //The purpose of the AuthContext.tsx file is to serve as a single source of truth for your user's authentication 
-// status across your entire frontend application.
+// status across the entire frontend application.
 
 
 // --- 1. Define Types ---
 
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  location: string | null;
-}
 
 // The shape of the context values provided to components
 interface AuthContextType {

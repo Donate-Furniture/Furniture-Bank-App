@@ -21,7 +21,7 @@ export default function Navbar() {
                     
                     {/* Logo/Home Link */}
                     <Link href="/" className="flex-shrink-0 text-xl font-bold text-indigo-600">
-                        Furniture MVP
+                        Home
                     </Link>
 
                     {/* Navigation and Auth Links */}
@@ -29,6 +29,14 @@ export default function Navbar() {
                         
                         {isAuthenticated && (
                             <>
+                                {/* Link to Profile/Dashboard */}
+                                <Link
+                                    href="/profile"
+                                    className="text-gray-600 hover:text-indigo-600 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Profile
+                                </Link>
+                                
                                 {/* Link to Create Listing Page (Visible only when logged in) */}
                                 <Link
                                     href="/listings/create"
@@ -37,11 +45,7 @@ export default function Navbar() {
                                     Post Item
                                 </Link>
                                 <br></br>
-                                {/* Display User Name */}
-                                <span className="text-gray-700 text-sm hidden sm:block">
-                                    Hi, {user?.firstName}
-                                </span>
-                                <br></br>
+                               
                                 {/* Sign Out Button */}
                                 <button
                                     onClick={handleSignOut}

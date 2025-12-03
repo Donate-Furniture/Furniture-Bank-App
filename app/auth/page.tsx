@@ -1,32 +1,37 @@
-// File: app/auth/page.tsx
-'use client';
+'use client'; 
 
 import { useState } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; 
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const searchParams = useSearchParams(); 
+
+  //'?mode=register'. If present, default to isLogin: false (Register).
+  const initialMode = searchParams.get('mode') === 'register' ? false : true; 
   
+  // Initialize state based on the URL parameter (defaults to true/Login if no param)
+  const [isLogin, setIsLogin] = useState(initialMode);
+  
+  // Form Data State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // CHANGE: Separate state for first and last name
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  
   const [location, setLocation] = useState('');
   const [error, setError] = useState('');
 
+  // Hooks
   const { login } = useAuth(); 
   const router = useRouter(); 
 
+  // Handle Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
     
-    // CHANGE: Update payload structure
     const payload = isLogin 
       ? { email, password } 
       : { email, password, firstName, lastName, location };
@@ -69,7 +74,7 @@ export default function AuthPage() {
           )}
           
           <div className="rounded-md shadow-sm space-y-4">
-            {/* CHANGE: Split Name Inputs (Register Only) */}
+            {/* Name Field (Register Only) */}
             {!isLogin && (
               <div className="flex gap-4">
                 <div className="w-1/2">
@@ -97,6 +102,7 @@ export default function AuthPage() {
               </div>
             )}
 
+            {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Email address</label>
               <input
@@ -109,6 +115,7 @@ export default function AuthPage() {
               />
             </div>
 
+            {/* Password Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Password</label>
               <input
@@ -121,6 +128,7 @@ export default function AuthPage() {
               />
             </div>
 
+             {/* Location Field (Register Only) */}
              {!isLogin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">Location (City)</label>
