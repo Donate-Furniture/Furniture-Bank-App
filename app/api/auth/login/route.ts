@@ -56,6 +56,7 @@ export async function POST(request: Request) {
           firstName: user.firstName,
           lastName: user.lastName,
           location: user.location,
+          createdAt: user.createdAt,
         },
       },
       { status: 200 } // OK

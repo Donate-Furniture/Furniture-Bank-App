@@ -51,6 +51,7 @@ export async function POST(request: Request) {
           firstName: newUser.firstName,
           lastName: newUser.lastName,
           location: newUser.location,
+          createdAt: newUser.createdAt,
         },
       },
       { status: 201 }

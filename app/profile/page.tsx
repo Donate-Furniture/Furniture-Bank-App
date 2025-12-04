@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import MyListings from '@/app/components/MyListings';
 
 export default function ProfilePage() {
+    
     const { user, isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
-
+    console.log('user.createdAt:', user?.createdAt);
     // Protection Check: Redirect if not authenticated
     if (!isLoading && !isAuthenticated) {
         router.push('/auth');
