@@ -1,6 +1,6 @@
 import './globals.css'; // Import global styles
 import { Inter } from 'next/font/google'; 
-import AuthWrapper from '@/app/components/AuthWrapper'; // Import our client-side wrapper
+import { NextAuthProvider } from '@/app/components/NextAuthProvider'; 
 import Navbar from '@/app/components/Navbar'; 
 import React from 'react';
 
@@ -14,23 +14,22 @@ export const metadata = {
 
 // The Root Layout (Server Component)
 export default function RootLayout({
-  children,
+    children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthWrapper>
+        {/*WRAP WITH NEXTAUTH PROVIDER */}
+        <NextAuthProvider>
           <div className="min-h-screen flex flex-col bg-gray-50">
-
             <Navbar /> 
-            
             <main className="flex-grow">
               {children}
             </main>
           </div>
-        </AuthWrapper>
+        </NextAuthProvider>
       </body>
     </html>
   );

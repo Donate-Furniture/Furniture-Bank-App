@@ -1,34 +1,50 @@
 // File: app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
-import { hashPassword, generateToken } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth'; // Only import hashPassword (no generateToken needed)
 import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // User parameters
-    const { email, password, firstName, lastName, location } = body;
+    
+    // Destructure all the fields from the form
+    const { 
+        email, password, firstName, lastName, 
+        phoneNumber, streetAddress, city, province, postalCode, 
+        provider, providerId 
+    } = body;
 
-    // validation
-    if (!email || !password || !firstName || !lastName) {
+    // --- 1. VALIDATION ---
+    
+    if (!email || !firstName || !lastName) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, password, first name, and last name are required.' },
+        { error: 'Missing required fields: email, first name, and last name.' },
         { status: 400 }
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'A user with this email address already exists.' },
-        { status: 409 }
-      );
+    // Strict Password Check: If not a social login, password is required
+    if (!provider && !password) {
+        return NextResponse.json(
+            { error: 'Password is required for email registration.' },
+            { status: 400 }
+        );
     }
 
-    const hashedPassword = await hashPassword(password);
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+        return NextResponse.json({ error: 'User with this email already exists.' }, { status: 409 });
+    }
+
+    // --- 2. PREPARE DATA ---
+
+    let hashedPassword = null;
+    if (password) {
+        hashedPassword = await hashPassword(password);
+    }
+
+    // --- 3. CREATE USER IN DATABASE ---
 
     const newUser = await prisma.user.create({
       data: {
@@ -36,31 +52,39 @@ export async function POST(request: Request) {
         password: hashedPassword,
         firstName,
         lastName,
-        location: location || null,
+        // Save Address & Contact Info
+        phoneNumber: phoneNumber || null,
+        streetAddress: streetAddress || null,
+        city: city || null,
+        province: province || null,
+        postalCode: postalCode || null,
+        
+        // Save Provider Metadata
+        provider: provider || 'credentials',
+        providerId: providerId || null,
       },
     });
 
-    const token = generateToken(newUser);
+    // --- 4. RESPONSE ---
+    
+    // The frontend will receive this 201 OK, and then immediately call 
+    // signIn('credentials') from NextAuth to create the session.
 
     return NextResponse.json(
       {
-        token,
+        message: "User registered successfully",
         user: {
           id: newUser.id,
           email: newUser.email,
           firstName: newUser.firstName,
           lastName: newUser.lastName,
-          location: newUser.location,
-          createdAt: newUser.createdAt,
         },
       },
       { status: 201 }
     );
+
   } catch (error) {
     console.error('Registration error:', error);
-    return NextResponse.json(
-      { error: 'An unexpected error occurred during registration.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error during registration.' }, { status: 500 });
   }
 }

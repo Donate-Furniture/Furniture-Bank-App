@@ -1,22 +1,42 @@
+// File: app/profile/page.tsx
 'use client';
 
-import { useAuth } from '@/app/context/AuthContext';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import MyListings from '@/app/components/MyListings';
 
+// Helper function to safely format dates
+const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Unknown';
+    try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    } catch (e) {
+        return 'Invalid Date';
+    }
+};
+
 export default function ProfilePage() {
-    
-    const { user, isAuthenticated, isLoading } = useAuth();
+    //Use useSession hook
+    const { data: session, status } = useSession();
     const router = useRouter();
-    console.log('user.createdAt:', user?.createdAt);
-    // Protection Check: Redirect if not authenticated
-    if (!isLoading && !isAuthenticated) {
+
+    // Loading State
+    if (status === 'loading') {
+        return <p className="text-center p-10">Loading profile data...</p>;
+    }
+
+    // Redirect if not authenticated
+    if (status === 'unauthenticated') {
         router.push('/auth');
         return null; 
     }
 
-    if (isLoading || !user) return <p className="text-center p-10">Loading profile data...</p>;
-    
+    const user = session?.user;
+
     return (
         <div className="max-w-7xl mx-auto p-6 lg:p-8">
             <h1 className="text-4xl font-bold mb-8 text-gray-800 border-b pb-2">
@@ -30,21 +50,22 @@ export default function ProfilePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
                     <p>
-                        <span className="font-medium">Name:</span> {user.firstName} {user.lastName}
+                        {/* Use type assertion (as any) to access custom fields we added to the session */}
+                        <span className="font-medium">Name:</span> {(user as any)?.firstName} {(user as any)?.lastName || user?.name}
                     </p>
                     <p>
-                        <span className="font-medium">Email:</span> {user.email}
+                        <span className="font-medium">Email:</span> {user?.email}
                     </p>
                     <p>
-                        <span className="font-medium">Location:</span> {user.location || 'Not set'}
+                        <span className="font-medium">City:</span> {(user as any)?.city || 'Not set'}
                     </p>
                     <p>
-                        <span className="font-medium">Member Since:</span> {new Date(user.createdAt).toLocaleDateString()}
+                        <span className="font-medium">Member Since:</span> {formatDate((user as any)?.createdAt)}
                     </p>
                 </div>
             </div>
 
-            {/* My Listings Section (Component to be created) */}
+            {/* My Listings Section */}
             <div className="mt-10">
                 <MyListings /> 
             </div>

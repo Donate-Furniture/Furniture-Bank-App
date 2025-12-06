@@ -1,10 +1,12 @@
+// File: app/listings/[id]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation'; 
 import Link from 'next/link';
 import { Listing } from '@/lib/types'; 
-import { useAuth } from '@/app/context/AuthContext'; 
+// ✅ CHANGE: Import useSession instead of useAuth
+import { useSession } from 'next-auth/react'; 
 
 const timeAgo = (dateString: string): string => {
   const now = new Date();
@@ -23,7 +25,9 @@ export default function ListingDetailPage() {
   const params = useParams(); 
   const listingId = params.id as string;
   
-  const { user, token } = useAuth(); 
+  // ✅ CHANGE: Use NextAuth session to get the current user
+  const { data: session } = useSession();
+  const user = session?.user;
   const router = useRouter();
 
   const [listing, setListing] = useState<Listing | null>(null);
@@ -61,9 +65,7 @@ export default function ListingDetailPage() {
     try {
         const res = await fetch(`/api/listings/${listingId}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}` 
-            }
+            // ✅ CHANGE: No headers needed! NextAuth cookies are sent automatically.
         });
 
         if (!res.ok) throw new Error('Failed to delete');
@@ -80,12 +82,14 @@ export default function ListingDetailPage() {
   if (error) return <p className="text-center p-10 text-red-600">Error: {error}</p>;
   if (!listing) return <p className="text-center p-10">Listing Not Found (404)</p>;
 
-  // Check if logged-in user is the owner
-  const isOwner = user && user.id === listing.user.id;
+  // --- Ownership Check ---
+  // ✅ CHANGE: Check against session user ID
+  // Note: We cast user as any because our custom ID field might not be on the default NextAuth type definition yet
+  const isOwner = user && (user as any).id === listing.user.id;
 
-  const formattedPrice = listing.price === null || listing.price === 0 
+  const formattedPrice = listing.originalPrice === null || listing.originalPrice === 0 
     ? 'FREE / TRADE' 
-    : `$${listing.price.toFixed(2)}`;
+    : `$${listing.originalPrice.toFixed(2)}`;
 
   return (
     <div className="max-w-4xl mx-auto p-6 lg:p-8 bg-white shadow-lg rounded-xl my-10">
@@ -118,13 +122,8 @@ export default function ListingDetailPage() {
                     <span className="font-medium">Located In:</span> {listing.city} {listing.zipCode ? `(${listing.zipCode})` : ''}
                 </p>
                 
-                {/* LOGIC: 
-                    If Owner -> Show Edit AND Delete buttons.
-                    If Buyer -> Show Contact button.
-                */}
                 {isOwner ? (
                     <div className="space-y-3">
-                        {/* 1. Edit Button */}
                         <Link 
                             href={`/listings/${listingId}/edit`}
                             className="w-full block text-center bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition-colors"
@@ -132,7 +131,6 @@ export default function ListingDetailPage() {
                             Edit Listing
                         </Link>
 
-                        {/* 2. Delete Button */}
                         <button
                             onClick={handleDelete}
                             disabled={isDeleting}

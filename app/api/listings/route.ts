@@ -1,110 +1,136 @@
+// File: app/api/listings/route.ts
 import { NextResponse, NextRequest } from 'next/server';
-import { authenticate, AuthenticatedRequest } from '@/lib/middlewares/authMiddleware';
 import prisma from '@/lib/prisma';
+import { getServerSession } from 'next-auth'; // Import NextAuth session handler
+import { authOptions } from '../auth/[...nextauth]/route'; // Import auth config
+
+// --- HELPER: The Pricing Algorithm (Remains the same) ---
+function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string): number {
+    if (originalPrice < 20) return 0;
+
+    const currentYear = new Date().getFullYear();
+    const age = currentYear - purchaseYear;
+    let value = 0;
+
+    if (age <= 1) {
+        value = originalPrice * 0.60;
+    } else if (age <= 2) {
+        value = originalPrice * 0.50;
+    } else {
+        value = originalPrice * 0.34;
+    }
+
+    if (condition === 'well_used') {
+        value = value * 0.50;
+    }
+
+    return Math.round(value * 100) / 100;
+}
 
 // Define the POST method handler for creating a new listing
 export async function POST(request: NextRequest) {
-    // 1. Run the Authentication Middleware
-    // The middleware checks the JWT and returns [user, error_response]
-    const [authenticatedRequest, response] = await authenticate(request);
+    // 1. Check Session (Server-Side Protection)
+    const session = await getServerSession(authOptions);
 
-    // If authentication failed, stop here and return the error response immediately.
-    if (response) {
-        return response; // Returns 401 Unauthorized error
+    if (!session || !session.user) {
+        return NextResponse.json(
+            { error: 'Unauthorized: You must be logged in.' }, 
+            { status: 401 }
+        );
     }
 
-    // Now we know the user is logged in, and their data is attached to the request
-    const req = authenticatedRequest as AuthenticatedRequest;
-
-    // We can safely extract the user ID
-    const userId = req.user!.id; 
+    // Safely extract User ID from the session
+    // Note: We ensured 'id' exists in the session callback in [...nextauth]/route.ts
+    const userId = (session.user as any).id;
 
     try {
-        // 2. Parse the listing data payload
-        const body = await req.json();
-        const { title, description, category, price, city, zipCode, imageUrls } = body;
+        const body = await request.json();
+        // Extract new fields
+        const { 
+            title, description, category, city, zipCode, imageUrls, 
+            subCategory, isValuated, valuationPrice,
+            originalPrice, purchaseYear, condition 
+        } = body; 
 
-        // 3. Simple Validation (ensure required fields are present)
-        if (!title || !description || !category || !city || !imageUrls || imageUrls.length === 0) {
-            return NextResponse.json(
-                { error: 'Missing required fields for listing (title, description, category, city, and at least one image).' },
-                { status: 400 }
-            );
+        // Validation
+        if (!title || !originalPrice || !purchaseYear || !condition) {
+            return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
         }
 
-        // 4. Create the new Listing record in PostgreSQL using Prisma
+        const billPrice = parseFloat(originalPrice);
+        const year = parseInt(purchaseYear);
+
+        // --- ALGORITHM LOGIC ---
+        let finalEstimatedValue = 0;
+        let finalValuationPrice = null;
+
+        if (billPrice > 650) {
+            if (!isValuated || !valuationPrice) {
+                return NextResponse.json(
+                    { error: 'Items with a bill price over $650 require a professional valuation.' },
+                    { status: 400 }
+                );
+            }
+            finalValuationPrice = parseFloat(valuationPrice);
+            finalEstimatedValue = finalValuationPrice;
+        } else {
+            if (isValuated && valuationPrice) {
+                finalValuationPrice = parseFloat(valuationPrice);
+                finalEstimatedValue = finalValuationPrice;
+            } else {
+                finalEstimatedValue = calculateEstimatedValue(billPrice, year, condition);
+            }
+        }
+
         const newListing = await prisma.listing.create({
             data: {
                 title,
                 description,
                 category,
-                price: price ? parseFloat(price) : null, // Convert price to Float or set to null
+                subCategory: subCategory || null,
+                
+                originalPrice: billPrice,
+                purchaseYear: year,
+                condition, 
+
+                isValuated: isValuated || false,
+                valuationPrice: finalValuationPrice,
+                estimatedValue: finalEstimatedValue, 
+
                 city,
                 zipCode: zipCode || null,
                 imageUrls: imageUrls || [],
-                // Crucially, link the listing to the authenticated user ID
                 userId: userId, 
             },
         });
 
-        // 5. Success Response
-        return NextResponse.json(
-            {
-                message: 'Listing created successfully.',
-                listing: newListing,
-            },
-            { status: 201 } // 201 Created
-        );
+        return NextResponse.json({ message: 'Listing created successfully.', listing: newListing }, { status: 201 });
 
     } catch (error) {
         console.error('Error creating listing:', error);
-        return NextResponse.json(
-            { error: 'An unexpected server error occurred while creating the listing.' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'An unexpected server error occurred.' }, { status: 500 });
     }
 }
 
-// -------------------------------------------------------------------------
-// GET method handler for fetching all listings
-// -------------------------------------------------------------------------
-
+// GET Handler (Public - No Auth Required)
 export async function GET(request: NextRequest) {
     try {
-        // NOTE: We are NOT requiring authentication for viewing listings (public data)
-        
-        // Fetch all listings from the database, ordering by creation date (newest first)
         const listings = await prisma.listing.findMany({
-            orderBy: {
-                createdAt: 'desc',
-            },
-            // Include the user data (firstName, lastName) via the relationship
+            orderBy: { createdAt: 'desc' },
             include: {
                 user: {
                     select: {
                         firstName: true,
                         lastName: true,
                         location: true,
+                        city: true, // Return city if available
+                        email: true,
                     }
                 }
             }
         });
-
-        return NextResponse.json(
-            { listings },
-            { status: 200 }
-        );
-
+        return NextResponse.json({ listings }, { status: 200 });
     } catch (error) {
-        console.error('Error fetching listings:', error);
-        return NextResponse.json(
-            { error: 'An unexpected server error occurred while fetching listings.' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Error fetching listings.' }, { status: 500 });
     }
 }
-
-// ----------------------------------------------------
-// NOTE: We do not define PUT, or DELETE here yet.
-// Those will be added later when we build the search/filter features.
-// ----------------------------------------------------

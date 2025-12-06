@@ -1,34 +1,32 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/app/context/AuthContext';
+import { useSession } from 'next-auth/react';
 import { Listing } from '@/lib/types'; 
 import ListingCard from './ListingCard';
 
 
 
 export default function MyListings() {
-    const { token } = useAuth();
+    const { status } = useSession(); // We just check status, cookies handle the rest
     const [listings, setListings] = useState<Listing[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!token) return; // Wait for the token to be present
+        // Only fetch if authenticated
+        if (status !== 'authenticated') return;
 
         const fetchMyListings = async () => {
             try {
+                // ✅ CHANGE: No headers needed! Cookies are sent automatically.
                 const res = await fetch('/api/listings/mine', {
                     method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`, // Send JWT to access protected route
-                    },
                 });
 
                 const data = await res.json();
 
                 if (!res.ok) {
-                    // This will catch 401 errors from the middleware
                     throw new Error(data.error || 'Failed to fetch your listings.');
                 }
 
@@ -41,7 +39,7 @@ export default function MyListings() {
         };
 
         fetchMyListings();
-    }, [token]);
+    }, [status]);
 
 
     return (
@@ -66,8 +64,6 @@ export default function MyListings() {
                     <ListingCard key={listing.id} listing={listing} />
                 ))}
             </div>
-            
-            {/* NOTE: We will add Edit/Delete buttons to this view later! */}
         </div>
     );
 }

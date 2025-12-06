@@ -1,15 +1,18 @@
 // File: app/page.tsx
 'use client';
 
-import { useAuth } from '@/app/context/AuthContext';
+import { useSession, signOut } from 'next-auth/react'; 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import ListingCard from '@/app/components/ListingCard';
 import { Listing } from '@/lib/types';
 
 export default function Home() {
-  const { user, logout, isLoading, isAuthenticated } = useAuth();
-  
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+  const isLoading = status === 'loading';
+  const user = session?.user; // Contains name, email, image, and our custom firstName/lastName
+
   // State for listings
   const [listings, setListings] = useState<Listing[]>([]);
   const [isFetchingListings, setIsFetchingListings] = useState(true);
@@ -33,17 +36,19 @@ export default function Home() {
     }
   };
 
-  // Fetch listings only once after initial load
+  // Fetch listings only when authenticated
   useEffect(() => {
-    if (!isLoading) {
+    if (status === 'authenticated') {
         fetchListings();
+    } else if (status === 'unauthenticated') {
+        setIsFetchingListings(false);
     }
-  }, [isLoading]);
+  }, [status]);
 
 
   // --- Render Logic ---
 
-  if (isLoading || isFetchingListings) {
+  if (isLoading || (isAuthenticated && isFetchingListings)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Loading application data...</p>
@@ -51,21 +56,18 @@ export default function Home() {
     );
   }
 
-   // --- Logged In Dashboard (The view that shows the listings) ---
+  // --- Logged In Dashboard ---
   if (isAuthenticated) {
     return (
       <div className="max-w-7xl mx-auto p-6 lg:p-8">
-        <h2 className="text-3xl font-semibold mb-6 text-gray-800">
-            Welcome Back, {user?.firstName}!
-        </h2>
+        <div className="flex justify-between items-center mb-6">
+            <h2 className="text-3xl font-semibold text-gray-800">
+                {/* Access custom fields via type assertion or fallback */}
+                Welcome Back, {(user as any)?.firstName || user?.name || 'User'}!
+            </h2>
+        </div>
         
-        {/*
-          - default (mobile): 1 column
-          - sm (small screens): 2 columns
-          - md (medium screens): 3 columns
-          - lg (large screens): 4 columns 
-        */}
-        
+        {/* Listings Display Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {listings.length > 0 ? (
                 listings.map((listing) => (
@@ -86,6 +88,7 @@ export default function Home() {
       </div>
     );
   }
+
   // --- Logged Out Welcome Screen ---
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-gray-50">
@@ -97,15 +100,13 @@ export default function Home() {
             Join the community to trade furniture securely.
           </p>
           
-          {/* FIX: Two separate buttons instead of one link */}
           <div className="flex gap-4 justify-center">
-            
-              {/* Primary Action: Register */}
+            {/* Primary Action: Register */}
             <Link
               href="/auth?mode=register"
               className="bg-indigo-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md"
             >
-              Register
+              Start Trading (Register)
             </Link>
 
             {/* Secondary Action: Login */}

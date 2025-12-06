@@ -18,50 +18,59 @@ datasource db {
 
 // The User Model: Stores all user information
 model User {
-  // Primary Key and Unique Identifier
-  id        String   @id @default(uuid()) // Automatically generates a unique ID (UUID)
+  id            String    @id @default(uuid())
+  email         String    @unique
   
-  // Credentials (Used for Authentication)
-  email     String   @unique // MUST be unique for login purposes
-  password  String   // Stores the HASHED password (never plain text)
+  // Password is optional (Social users won't have one)
+  password      String?
 
-  // Profile Information
-  firstName String
-  lastName  String
-  location  String? // Optional field: Location/City for local trade matching
-
-  // Timestamps
-  createdAt DateTime @default(now()) // Timestamp when the user was created
-  updatedAt DateTime @updatedAt // Timestamp automatically updated on every change
-
-  // Relationships: These link the user to other tables (no column created here)
-  listings  Listing[] // A list of listings posted by this user
+  //Fields to identify social login users
+  provider      String?   // e.g., "google", "facebook", "credentials" (for email/pass)
+  providerId    String?   // The unique ID returned by the social platform
   
-  @@map("users") // Sets the physical table name in PostgreSQL
+  //Contact & Address Fields
+  firstName     String
+  lastName      String
+
+  phoneNumber   String?
+  streetAddress String?
+  postalCode    String?
+  city          String?
+  province      String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  listings      Listing[]
+  @@map("users")
 }
 
-// The Listing Model: Stores furniture item details
+// The User Model: Stores all listing information
 model Listing {
   id              String    @id @default(uuid())
-  
-  // Core Item Details
   title           String    @db.VarChar(255)
   description     String
-  category        String    // e.g., 'Sofa', 'Table', 'Chair'
-  price           Float?    // Price if selling (optional)
-  status          String    @default("available") // 'available', 'pending', 'sold/taken'
+  category        String    
+  subCategory     String?   
+
+  originalPrice   Float     // The Bill Price
+  purchaseYear    Int       // To calculate Age
+  condition       String    // 'like_new', 'excellent', 'well_used'
   
-  // Location and Images
+  // Valuation & Result
+  isValuated      Boolean   @default(false) 
+  valuationPrice  Float?    // Professional appraisal (Overrides algo)
+  estimatedValue  Float?    // ThQe FINAL calculated price to show (Algo result OR Valuation)
+
+  // REMOVED: price Float? (User asking price is gone)
+  
+  status          String    @default("available") 
   city            String
   zipCode         String?
-  // NOTE: Images are stored as URLs in an array of strings, not the image data itself
   imageUrls       String[]  
   
-  // Relationship to the User table (Foreign Key)
   userId          String
-  user            User      @relation(fields: [userId], references: [id]) // Links to the User model
+  user            User      @relation(fields: [userId], references: [id]) 
 
-  // Timestamps
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
