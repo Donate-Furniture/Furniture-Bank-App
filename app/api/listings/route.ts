@@ -1,4 +1,6 @@
-// File: app/api/listings/route.ts
+//Create new listing
+// Display all listings in the website
+//filtering and search will be added here
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth'; // Import NextAuth session handler
@@ -112,25 +114,86 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// GET Handler (Public - No Auth Required)
+// GET Handler (Public Search)
+// Updated to exclude 'donated' items by default
 export async function GET(request: NextRequest) {
     try {
-        const listings = await prisma.listing.findMany({
-            orderBy: { createdAt: 'desc' },
-            include: {
-                user: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        location: true,
-                        city: true, // Return city if available
-                        email: true,
+        const { searchParams } = new URL(request.url);
+        
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '12'); 
+        const skip = (page - 1) * limit;
+
+        const search = searchParams.get('search');
+        const category = searchParams.get('category');
+        const city = searchParams.get('city');
+        const condition = searchParams.get('condition');
+        const minPrice = searchParams.get('minPrice');
+        const maxPrice = searchParams.get('maxPrice');
+        const sort = searchParams.get('sort'); 
+
+        // 1. Build Query
+        const whereClause: any = {
+            //Only show available or pending items. Hide 'donated'.
+            status: { not: 'donated' }
+        };
+
+        if (search) {
+            whereClause.OR = [
+                { title: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+
+        if (category && category !== 'All') whereClause.category = category;
+        if (city) whereClause.city = { contains: city, mode: 'insensitive' };
+        if (condition && condition !== 'All') whereClause.condition = condition;
+
+        if (minPrice || maxPrice) {
+            whereClause.estimatedValue = {};
+            if (minPrice) whereClause.estimatedValue.gte = parseFloat(minPrice);
+            if (maxPrice) whereClause.estimatedValue.lte = parseFloat(maxPrice);
+        }
+
+        let orderBy: any = { createdAt: 'desc' };
+        if (sort === 'price_asc') orderBy = { estimatedValue: 'asc' };
+        if (sort === 'price_desc') orderBy = { estimatedValue: 'desc' };
+        if (sort === 'date_asc') orderBy = { createdAt: 'asc' };
+        if (sort === 'date_desc') orderBy = { createdAt: 'desc' };
+
+        // 2. Execute Query
+        const [listings, totalCount] = await prisma.$transaction([
+            prisma.listing.findMany({
+                where: whereClause,
+                orderBy: orderBy,
+                take: limit, 
+                skip: skip,  
+                include: {
+                    user: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            city: true,
+                            email: true,
+                        }
                     }
                 }
+            }),
+            prisma.listing.count({ where: whereClause })
+        ]);
+
+        return NextResponse.json({ 
+            listings,
+            pagination: {
+                total: totalCount,
+                page,
+                limit,
+                totalPages: Math.ceil(totalCount / limit)
             }
-        });
-        return NextResponse.json({ listings }, { status: 200 });
+        }, { status: 200 });
+
     } catch (error) {
+        console.error('Error fetching listings:', error);
         return NextResponse.json({ error: 'Error fetching listings.' }, { status: 500 });
     }
 }

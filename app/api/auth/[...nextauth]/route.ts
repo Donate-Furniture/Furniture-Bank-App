@@ -2,8 +2,7 @@
 import NextAuth, { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
-import AppleProvider from "next-auth/providers/apple"; // <-- New Import
-import TwitterProvider from "next-auth/providers/twitter"; // <-- New Import
+import AppleProvider from "next-auth/providers/apple"; 
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/lib/prisma";
@@ -27,11 +26,6 @@ export const authOptions: AuthOptions = {
     AppleProvider({
       clientId: process.env.APPLE_ID || "",
       clientSecret: process.env.APPLE_SECRET || "",
-    }),
-    TwitterProvider({
-      clientId: process.env.TWITTER_CLIENT_ID || "",
-      clientSecret: process.env.TWITTER_CLIENT_SECRET || "",
-      version: "2.0", // Use API v2
     }),
     
     // 3. Credentials Provider (Your Custom Email/Password Logic)

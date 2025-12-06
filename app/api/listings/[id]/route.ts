@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route'; 
 
 // Define the GET method handler to fetch a single listing by ID
-// (GET is public, so no auth check needed here)
+// GET, PUT, DELETE for a listing happens here. 
 export async function GET(
     request: NextRequest, 
     { params }: { params: { id: string } } 
@@ -23,7 +23,7 @@ export async function GET(
                         id: true,
                         firstName: true, 
                         lastName: true,  
-                        location: true,
+                        city: true,
                         email: true, 
                     }
                 }
@@ -56,7 +56,7 @@ export async function PUT(
     request: NextRequest, 
     { params }: { params: { id: string } }
 ) {
-    // 1. Check Session (Replaces old authenticate middleware)
+    // 1. Check Session
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {

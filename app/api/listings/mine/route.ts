@@ -1,4 +1,4 @@
-// File: app/api/listings/mine/route.ts
+// All listings of logged in user
 import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
                     select: {
                         firstName: true,
                         lastName: true,
-                        location: true, // Legacy field
                         city: true,     // New field
                         email: true,
                     }

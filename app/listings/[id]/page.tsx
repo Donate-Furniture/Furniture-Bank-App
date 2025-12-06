@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation'; 
 import Link from 'next/link';
 import { Listing } from '@/lib/types'; 
-// ✅ CHANGE: Import useSession instead of useAuth
 import { useSession } from 'next-auth/react'; 
 
 const timeAgo = (dateString: string): string => {
@@ -19,6 +18,20 @@ const timeAgo = (dateString: string): string => {
   if (diffInHours < 24) return `${diffInHours} hours ago`;
   const diffInDays = Math.floor(diffInHours / 24);
   return `${diffInDays} days ago`;
+};
+
+// Helper to get status badge color
+const getStatusBadge = (status: string) => {
+    switch (status) {
+        case 'available':
+            return <span className="text-sm font-bold px-3 py-1 rounded-full bg-green-100 text-green-800">Available</span>;
+        case 'on_hold': // 'on hold for someone'
+            return <span className="text-sm font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-800">On Hold</span>;
+        case 'donated':
+            return <span className="text-sm font-bold px-3 py-1 rounded-full bg-gray-200 text-gray-600">Donated</span>;
+        default:
+            return <span className="text-sm font-bold px-3 py-1 rounded-full bg-gray-100 text-gray-800">{status}</span>;
+    }
 };
 
 export default function ListingDetailPage() {
@@ -65,7 +78,6 @@ export default function ListingDetailPage() {
     try {
         const res = await fetch(`/api/listings/${listingId}`, {
             method: 'DELETE',
-            // ✅ CHANGE: No headers needed! NextAuth cookies are sent automatically.
         });
 
         if (!res.ok) throw new Error('Failed to delete');
@@ -83,13 +95,12 @@ export default function ListingDetailPage() {
   if (!listing) return <p className="text-center p-10">Listing Not Found (404)</p>;
 
   // --- Ownership Check ---
-  // ✅ CHANGE: Check against session user ID
-  // Note: We cast user as any because our custom ID field might not be on the default NextAuth type definition yet
   const isOwner = user && (user as any).id === listing.user.id;
 
-  const formattedPrice = listing.originalPrice === null || listing.originalPrice === 0 
-    ? 'FREE / TRADE' 
-    : `$${listing.originalPrice.toFixed(2)}`;
+  // Use estimatedValue for Tax Receipt purposes
+  const taxValue = listing.estimatedValue !== null 
+    ? `$${listing.estimatedValue.toFixed(2)}` 
+    : 'Pending Calculation';
 
   return (
     <div className="max-w-4xl mx-auto p-6 lg:p-8 bg-white shadow-lg rounded-xl my-10">
@@ -100,7 +111,7 @@ export default function ListingDetailPage() {
       
       <div className="md:flex md:space-x-8">
         
-        {/* Left Column: Image & Seller Info */}
+        {/* Left Column: Image & Donor Info */}
         <div className="md:w-1/2 space-y-6">
             <div className="bg-gray-200 rounded-lg overflow-hidden shadow-md h-64 md:h-80">
                 <img 
@@ -114,9 +125,9 @@ export default function ListingDetailPage() {
             </div>
             
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-semibold mb-2">Seller Details</h3>
+                <h3 className="text-lg font-semibold mb-2">Donor Details</h3>
                 <p className="text-sm text-gray-700">
-                    <span className="font-medium">Posted By:</span> {listing.user.firstName} {listing.user.lastName}
+                    <span className="font-medium">Donated By:</span> {listing.user.firstName} {listing.user.lastName}
                 </p>
                 <p className="text-sm text-gray-700 mb-4">
                     <span className="font-medium">Located In:</span> {listing.city} {listing.zipCode ? `(${listing.zipCode})` : ''}
@@ -142,9 +153,9 @@ export default function ListingDetailPage() {
                 ) : (
                     <button
                         className="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition-colors"
-                        onClick={() => alert(`Contact ${listing.user.email}`)}
+                        onClick={() => alert(`Contact Donor at: ${listing.user.email}`)}
                     >
-                        Contact Seller
+                        Contact Donor
                     </button>
                 )}
             </div>
@@ -152,18 +163,39 @@ export default function ListingDetailPage() {
         
         {/* Right Column: Details */}
         <div className="md:w-1/2 pt-6 md:pt-0">
-            <span className="text-sm font-bold px-3 py-1 rounded-full bg-gray-200 text-gray-700">
-                {listing.category}
-            </span>
+            <div className="flex justify-between items-start mb-4">
+                <span className="text-sm font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
+                    {listing.category}
+                </span>
+                {getStatusBadge(listing.status)}
+            </div>
             
-            <h1 className="text-3xl font-extrabold text-gray-900 mt-2 mb-4">
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
                 {listing.title}
             </h1>
 
-            <p className="text-4xl font-extrabold text-green-700 mb-6">
-                {formattedPrice}
-                <span className="text-base text-gray-500 font-medium ml-2">({listing.status.toUpperCase()})</span>
-            </p>
+            {/* Donation / Tax Value Section */}
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-800 uppercase font-semibold tracking-wide">
+                    Estimated Tax Receipt Value
+                </p>
+                <p className="text-3xl font-extrabold text-green-700">
+                    {taxValue}
+                </p>
+                {listing.isValuated && (
+                    <span className="text-xs text-green-600 flex items-center mt-1">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                        Professionally Valuated
+                    </span>
+                )}
+            </div>
+
+            {/* Original Bill Price Display */}
+            <div className="mb-6 text-sm text-gray-500">
+                <p>Original Bill Price: <span className="font-medium text-gray-800">${listing.originalPrice?.toFixed(2)}</span></p>
+                <p>Condition: <span className="font-medium text-gray-800 capitalize">{listing.condition.replace('_', ' ')}</span></p>
+                <p>Purchased: <span className="font-medium text-gray-800">{listing.purchaseYear}</span></p>
+            </div>
             
             <h2 className="text-xl font-semibold text-gray-800 mb-2 border-b pb-1">
                 Description

@@ -1,6 +1,6 @@
 // File: app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
-import { hashPassword } from '@/lib/auth'; // Only import hashPassword (no generateToken needed)
+import { hashPassword } from '@/lib/auth'; 
 import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {

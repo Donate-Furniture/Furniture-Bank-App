@@ -25,6 +25,9 @@ const timeAgo = (dateString: string): string => {
 const ListingCard: React.FC<ListingProps> = ({ listing }) => {
   const imageUrl = listing.imageUrls[0];
   const formattedDate = timeAgo(listing.createdAt);
+   const displayPrice = listing.estimatedValue && listing.estimatedValue > 0 
+    ? `$${listing.estimatedValue.toFixed(2)}` 
+    : 'FREE';
 
  return (
     // Wrap the entire card in a Link component using the listing ID
@@ -44,15 +47,16 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
           />
         </div>
 
-        <div className="p-4">
+         <div className="p-4">
           {/* Price Tag */}
           <div className="flex justify-between items-center mb-2">
               <span className={`text-sm font-bold px-3 py-1 rounded-full ${
-                  listing.price !== null && listing.price > 0 
+                  listing.estimatedValue && listing.estimatedValue > 0 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-indigo-100 text-indigo-800'
               }`}>
-                  {listing.price !== null && listing.price > 0 ? `$${listing.price.toFixed(2)}` : 'FREE / TRADE'}
+                  {/* Show Estimated Value */}
+                  {displayPrice}
               </span>
               <span className="text-xs text-gray-500">{listing.category}</span>
           </div>
