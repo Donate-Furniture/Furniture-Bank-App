@@ -18,7 +18,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             throw new Error('Unauthorized');
         }
 
-        // 2. Limit file types (Optional but recommended)
+        // 2. Limit file types
         return {
           allowedContentTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
           tokenPayload: JSON.stringify({
@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           }),
         };
       },
-      // 3. Callback after upload finishes (Optional)
+      // 3. Callback after upload finishes 
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         console.log('Blob uploaded:', blob.url);
       },

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { NextAuthProvider } from '@/app/components/NextAuthProvider'; 
 import Navbar from '@/app/components/Navbar'; 
 import React from 'react';
+import FloatingInbox from '@/app/components/FloatingInbox';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
             <main className="flex-grow">
               {children}
             </main>
+            <FloatingInbox />
           </div>
         </NextAuthProvider>
       </body>
