@@ -64,7 +64,6 @@ export const authOptions: AuthOptions = {
             id: user.id,
             email: user.email,
             name: `${user.firstName} ${user.lastName}`, // Combine for NextAuth default
-            city: user.city,
             // Custom fields can be passed through via callbacks below
             firstName: user.firstName, 
             lastName: user.lastName,
@@ -87,6 +86,7 @@ export const authOptions: AuthOptions = {
         token.firstName = user.firstName;
         // @ts-ignore
         token.lastName = user.lastName;
+
       }
       return token;
     },

@@ -38,7 +38,6 @@ export default function ListingDetailPage() {
   const params = useParams(); 
   const listingId = params.id as string;
   
-  // ✅ CHANGE: Use NextAuth session to get the current user
   const { data: session } = useSession();
   const user = session?.user;
   const router = useRouter();
@@ -47,6 +46,9 @@ export default function ListingDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  //for image gallery
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     if (!listingId) return;
@@ -111,17 +113,44 @@ export default function ListingDetailPage() {
       
       <div className="md:flex md:space-x-8">
         
-        {/* Left Column: Image & Donor Info */}
+        {/* Left Column: Image Gallery & Donor Info */}
         <div className="md:w-1/2 space-y-6">
-            <div className="bg-gray-200 rounded-lg overflow-hidden shadow-md h-64 md:h-80">
-                <img 
-                    src={listing.imageUrls[0]} 
-                    alt={listing.title} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/CCCCCC/333333?text=Image+Unavailable';
-                    }}
-                />
+            
+            {/* IMAGE GALLERY SECTION */}
+            <div className="space-y-4">
+                {/* Main Image Display */}
+                <div className="bg-gray-200 rounded-lg overflow-hidden shadow-md h-64 md:h-80 relative">
+                    <img 
+                        src={listing.imageUrls[selectedImageIndex]} 
+                        alt={listing.title} 
+                        className="w-full h-full object-cover transition-opacity duration-300"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/CCCCCC/333333?text=Image+Unavailable';
+                        }}
+                    />
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                        {selectedImageIndex + 1} / {listing.imageUrls.length}
+                    </div>
+                </div>
+
+                {/* Thumbnails Row */}
+                {listing.imageUrls.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {listing.imageUrls.map((url, index) => (
+                            <button
+                                key={index}
+                                onClick={() => setSelectedImageIndex(index)}
+                                className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${
+                                    selectedImageIndex === index 
+                                    ? 'border-indigo-600 opacity-100 ring-2 ring-indigo-300' 
+                                    : 'border-transparent opacity-70 hover:opacity-100'
+                                }`}
+                            >
+                                <img src={url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
             
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -161,7 +190,7 @@ export default function ListingDetailPage() {
             </div>
         </div>
         
-        {/* Right Column: Details */}
+        {/* Right Column: Details (Same as before) */}
         <div className="md:w-1/2 pt-6 md:pt-0">
             <div className="flex justify-between items-start mb-4">
                 <span className="text-sm font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
@@ -195,6 +224,10 @@ export default function ListingDetailPage() {
                 <p>Original Bill Price: <span className="font-medium text-gray-800">${listing.originalPrice?.toFixed(2)}</span></p>
                 <p>Condition: <span className="font-medium text-gray-800 capitalize">{listing.condition.replace('_', ' ')}</span></p>
                 <p>Purchased: <span className="font-medium text-gray-800">{listing.purchaseYear}</span></p>
+                {/* Deadline Display */}
+                <p className="mt-2 text-red-600 font-medium">
+                    Pickup Deadline: {new Date(listing.createdAt).toLocaleDateString()} {/* TODO: Use real deadline field if available */}
+                </p>
             </div>
             
             <h2 className="text-xl font-semibold text-gray-800 mb-2 border-b pb-1">

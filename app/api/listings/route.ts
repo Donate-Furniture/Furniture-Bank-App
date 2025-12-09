@@ -1,77 +1,82 @@
-//Create new listing
-// Display all listings in the website
-//filtering and search will be added here
+// File: app/api/listings/route.ts
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth'; // Import NextAuth session handler
-import { authOptions } from '../auth/[...nextauth]/route'; // Import auth config
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
 
-// --- HELPER: The Pricing Algorithm (Remains the same) ---
+// --- HELPER: Pricing Algorithm ---
 function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string): number {
     if (originalPrice < 20) return 0;
+    
+    // If New, no depreciation. Value = Bill Price.
+    if (condition === 'new') {
+        return originalPrice;
+    }
 
     const currentYear = new Date().getFullYear();
     const age = currentYear - purchaseYear;
     let value = 0;
 
+    // 2. Calculate Age-Based Base Value (For Used items)
     if (age <= 1) {
+        // 1 year old or less = 40% off (Retain 60%)
         value = originalPrice * 0.60;
     } else if (age <= 2) {
+        // 2 years old = 50% off (Retain 50%)
         value = originalPrice * 0.50;
     } else {
+        // 3+ years old = 66% off (Retain 34%)
         value = originalPrice * 0.34;
     }
 
-    if (condition === 'well_used') {
+    // 3. Apply Condition Penalty
+    // 'used' gets an EXTRA 50% off the already depreciated value
+    if (condition === 'used') {
         value = value * 0.50;
     }
 
     return Math.round(value * 100) / 100;
 }
 
-// Define the POST method handler for creating a new listing
+//GET and POST handlers for listings
 export async function POST(request: NextRequest) {
-    // 1. Check Session (Server-Side Protection)
     const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-        return NextResponse.json(
-            { error: 'Unauthorized: You must be logged in.' }, 
-            { status: 401 }
-        );
-    }
-
-    // Safely extract User ID from the session
-    // Note: We ensured 'id' exists in the session callback in [...nextauth]/route.ts
-    const userId = (session.user as any).id;
+    if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = (session.user as any).id; 
 
     try {
         const body = await request.json();
-        // Extract new fields
+        // ... (Destructuring remains the same) ...
         const { 
-            title, description, category, city, zipCode, imageUrls, 
+            title, description, category, city, zipCode, imageUrls, receiptUrl, 
             subCategory, isValuated, valuationPrice,
-            originalPrice, purchaseYear, condition 
+            originalPrice, purchaseYear, condition,
+            collectionDeadline 
         } = body; 
 
         // Validation
-        if (!title || !originalPrice || !purchaseYear || !condition) {
-            return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+        if (!imageUrls || imageUrls.length < 4) {
+            return NextResponse.json({ error: 'Please upload at least 4 photos of the item.' }, { status: 400 });
+        }
+        
+        const deadlineDate = new Date(collectionDeadline);
+        const minDate = new Date();
+        minDate.setDate(minDate.getDate() + 7);
+        minDate.setHours(0,0,0,0);
+        deadlineDate.setHours(0,0,0,0);
+
+        if (deadlineDate < minDate) {
+             return NextResponse.json({ error: 'Collection deadline must be at least 1 week from today.' }, { status: 400 });
         }
 
         const billPrice = parseFloat(originalPrice);
         const year = parseInt(purchaseYear);
-
-        // --- ALGORITHM LOGIC ---
         let finalEstimatedValue = 0;
         let finalValuationPrice = null;
 
         if (billPrice > 650) {
             if (!isValuated || !valuationPrice) {
-                return NextResponse.json(
-                    { error: 'Items with a bill price over $650 require a professional valuation.' },
-                    { status: 400 }
-                );
+                return NextResponse.json({ error: 'Items > $650 require valuation.' }, { status: 400 });
             }
             finalValuationPrice = parseFloat(valuationPrice);
             finalEstimatedValue = finalValuationPrice;
@@ -86,40 +91,26 @@ export async function POST(request: NextRequest) {
 
         const newListing = await prisma.listing.create({
             data: {
-                title,
-                description,
-                category,
-                subCategory: subCategory || null,
-                
-                originalPrice: billPrice,
-                purchaseYear: year,
-                condition, 
-
-                isValuated: isValuated || false,
-                valuationPrice: finalValuationPrice,
-                estimatedValue: finalEstimatedValue, 
-
-                city,
-                zipCode: zipCode || null,
-                imageUrls: imageUrls || [],
-                userId: userId, 
+                title, description, category, subCategory: subCategory || null,
+                originalPrice: billPrice, purchaseYear: year, condition, 
+                isValuated: isValuated || false, valuationPrice: finalValuationPrice, estimatedValue: finalEstimatedValue,
+                city, zipCode: zipCode || null, 
+                imageUrls: imageUrls || [], 
+                receiptUrl: receiptUrl || null, 
+                collectionDeadline: new Date(collectionDeadline), 
+                userId, 
             },
         });
-
-        return NextResponse.json({ message: 'Listing created successfully.', listing: newListing }, { status: 201 });
-
+        return NextResponse.json({ message: 'Success', listing: newListing }, { status: 201 });
     } catch (error) {
-        console.error('Error creating listing:', error);
-        return NextResponse.json({ error: 'An unexpected server error occurred.' }, { status: 500 });
+        return NextResponse.json({ error: 'Server Error' }, { status: 500 });
     }
 }
 
-// GET Handler (Public Search)
-// Updated to exclude 'donated' items by default
+// ... (GET handler remains the same) ...
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '12'); 
         const skip = (page - 1) * limit;
@@ -132,9 +123,7 @@ export async function GET(request: NextRequest) {
         const maxPrice = searchParams.get('maxPrice');
         const sort = searchParams.get('sort'); 
 
-        // 1. Build Query
         const whereClause: any = {
-            //Only show available or pending items. Hide 'donated'.
             status: { not: 'donated' }
         };
 
@@ -161,7 +150,6 @@ export async function GET(request: NextRequest) {
         if (sort === 'date_asc') orderBy = { createdAt: 'asc' };
         if (sort === 'date_desc') orderBy = { createdAt: 'desc' };
 
-        // 2. Execute Query
         const [listings, totalCount] = await prisma.$transaction([
             prisma.listing.findMany({
                 where: whereClause,
@@ -193,7 +181,6 @@ export async function GET(request: NextRequest) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error('Error fetching listings:', error);
         return NextResponse.json({ error: 'Error fetching listings.' }, { status: 500 });
     }
 }

@@ -1,18 +1,19 @@
+// File: lib/types.ts
+
 // --- 1. Define the User Structure ---
 export interface User {
   id: string;
   email: string;
   firstName: string; 
   lastName: string;
-  phoneNumber?: string | null;
-  streetAddress?: string | null;
-  city?: string | null;
-  province?: string | null;
-  postalCode?: string | null;
-  createdAt: string;
-
-  // Auth Metadata
+  phoneNumber: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  location: string | null;
   provider?: string | null;
+  createdAt: string; 
 }
 
 // --- 2. Define the Listing Structure ---
@@ -22,12 +23,12 @@ export interface Listing {
   description: string;
   category: string;
   subCategory: string | null;
-
-  //pricing criterias
+  
+  // Pricing Algo Fields (Must be number/string to match DB)
   originalPrice: number;
   purchaseYear: number;
   condition: string;
-
+  
   // Valuation & Result
   isValuated: boolean;
   valuationPrice: number | null;
@@ -37,8 +38,12 @@ export interface Listing {
   city: string;
   zipCode: string | null;
   imageUrls: string[];
-  createdAt: string;
+  receiptUrl: string | null; 
 
+  collectionDeadline: string; 
+  
+  createdAt: string;
+  
   // Included User details
   user: {
     id: string;
@@ -47,4 +52,3 @@ export interface Listing {
     email: string;
   };
 }
-

@@ -6,6 +6,26 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { Listing } from '@/lib/types';
 
+const MAIN_CATEGORIES = ['Furniture', 'Vehicles', 'Books', 'Antique'];
+const CURRENT_YEAR = new Date().getFullYear();
+
+const getMinDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+};
+
+// Helper function to format DateTime string to YYYY-MM-DD for date input
+const toDateInputString = (dateString: string | undefined): string => {
+    if (!dateString) return '';
+    try {
+        // Ensure date is treated as UTC to prevent local timezone shifting the day
+        return new Date(dateString).toISOString().split('T')[0];
+    } catch {
+        return '';
+    }
+};
+
 export default function EditListingPage() {
   const { data: session, status } = useSession(); 
   const router = useRouter();
@@ -21,14 +41,17 @@ export default function EditListingPage() {
     city: '',
     zipCode: '',
     status: 'available',
+    collectionDeadline: '', // Initialized with empty string
   });
 
-  // Keep read-only data separate to avoid sending it back to API accidentally
+  // Keep read-only data separate
   const [readOnlyData, setReadOnlyData] = useState<{
     category: string;
     subCategory: string | null;
     estimatedValue: number | null;
     originalPrice: number;
+    // Add deadline here for initial formatting
+    collectionDeadline: string; 
   } | null>(null);
 
   const [error, setError] = useState('');
@@ -61,6 +84,8 @@ export default function EditListingPage() {
             city: listing.city,
             zipCode: listing.zipCode || '',
             status: listing.status,
+            // ✅ FIX: Format the date string for the input
+            collectionDeadline: toDateInputString(listing.collectionDeadline), 
         });
 
         // Set Read-Only Context
@@ -69,6 +94,7 @@ export default function EditListingPage() {
             subCategory: listing.subCategory,
             estimatedValue: listing.estimatedValue,
             originalPrice: listing.originalPrice,
+            collectionDeadline: listing.collectionDeadline,
         });
 
       } catch (err: any) {
@@ -101,17 +127,22 @@ export default function EditListingPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Only sending the fields allowed to be edited
         body: JSON.stringify(formData),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to update listing');
+        // Display backend validation error if the date is too soon
+        if (data.error) {
+            setError(data.error);
+        } else {
+             throw new Error('Failed to update listing');
+        }
+        
+      } else {
+        router.push(`/listings/${listingId}`);
       }
-
-      router.push(`/listings/${listingId}`);
 
     } catch (err: any) {
       setError(err.message);
@@ -121,6 +152,8 @@ export default function EditListingPage() {
   };
 
   if (isFetching || status === 'loading') return <p className="text-center p-10">Loading listing data...</p>;
+
+  const formattedValue = readOnlyData?.estimatedValue ? `$${readOnlyData.estimatedValue.toFixed(2)}` : 'Pending';
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg mt-10">
@@ -144,7 +177,7 @@ export default function EditListingPage() {
         <div className="text-right">
             <div className="font-semibold">Original Bill: ${readOnlyData?.originalPrice.toFixed(2)}</div>
             <div className="font-bold text-green-700">
-                Tax Value: {readOnlyData?.estimatedValue ? `$${readOnlyData.estimatedValue.toFixed(2)}` : 'Pending'}
+                Tax Value: {formattedValue}
             </div>
         </div>
       </div>
@@ -162,7 +195,7 @@ export default function EditListingPage() {
             >
                 <option value="available">Available</option>
                 <option value="on_hold">On Hold (Reserved)</option>
-                <option value="donated">Donated</option>
+                <option value="donated">Donated (Completed)</option>
             </select>
         </div>
 
@@ -192,7 +225,7 @@ export default function EditListingPage() {
           />
         </div>
 
-        {/* Location Row */}
+        {/* Location & Deadline Row */}
         <div className="flex gap-4">
           <div className="w-1/2">
             <label className="block text-sm font-medium text-gray-700">City</label>
@@ -206,14 +239,18 @@ export default function EditListingPage() {
             />
           </div>
           <div className="w-1/2">
-            <label className="block text-sm font-medium text-gray-700">Postal Code</label>
+            {/* ✅ EDITABLE DEADLINE FIELD */}
+            <label className="block text-sm font-medium text-gray-700">Latest Collection Date</label>
             <input 
-                name="zipCode" 
-                type="text" 
+                name="collectionDeadline" 
+                type="date" 
+                required 
+                min={getMinDate()} // UI min date enforcement
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                value={formData.zipCode} 
+                value={formData.collectionDeadline} 
                 onChange={handleChange} 
             />
+            <p className="text-xs text-gray-500 mt-1">Must be at least 1 week from today.</p>
           </div>
         </div>
 

@@ -72,9 +72,8 @@ export async function PUT(
     try {
         // 2. Parse the updates from the request body
         const body = await request.json();
-        const { title, description, category, price, status, city, zipCode, imageUrls,
-            subCategory, isValuated, valuationPrice, originalPrice, purchaseYear, condition
-        } = body;
+        // Extract the fields that can be updated
+        const { title, description, status, city, zipCode, collectionDeadline } = body; 
 
         // 3. Verify Ownership 
         const existingListing = await prisma.listing.findUnique({
@@ -92,32 +91,34 @@ export async function PUT(
             );
         }
 
-        // 4. Update the Listing
+        // 4. Validate New Collection Deadline (If provided)
+        let validatedDeadline: Date | undefined = undefined;
+        if (collectionDeadline) {
+             const deadlineDate = new Date(collectionDeadline);
+             const minDate = new Date();
+             minDate.setDate(minDate.getDate() + 7); // Min 7 days rule
+             
+             // Reset time components for comparison
+             minDate.setHours(0,0,0,0);
+             deadlineDate.setHours(0,0,0,0);
+
+             if (deadlineDate < minDate) {
+                return NextResponse.json({ error: 'Collection deadline must be at least 1 week from today.' }, { status: 400 });
+             }
+             validatedDeadline = new Date(collectionDeadline);
+        }
+
+
+        // 5. Update the Listing
         const updatedListing = await prisma.listing.update({
             where: { id: listingId },
             data: {
                 title: title || undefined,
                 description: description || undefined,
-                category: category || undefined,
-                subCategory: subCategory || undefined,
-                
-                // Algo fields
-                originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
-                purchaseYear: purchaseYear ? parseInt(purchaseYear) : undefined,
-                condition: condition || undefined,
-
-                // Valuation
-                isValuated: isValuated, // Boolean can be false, so don't use || undefined logic for it blindly if checking presence
-                valuationPrice: valuationPrice ? parseFloat(valuationPrice) : undefined,
-                
-                // Note: We might want to re-run the calculation algorithm here if prices changed.
-                // For MVP simplicity, we trust the client or leave estimatedValue as is for now.
-                
-
                 status: status || undefined, 
                 city: city || undefined,
                 zipCode: zipCode || undefined,
-                imageUrls: imageUrls || undefined,
+                collectionDeadline: validatedDeadline, // Use the validated date
             },
         });
 
