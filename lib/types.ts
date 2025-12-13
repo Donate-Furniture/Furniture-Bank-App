@@ -4,7 +4,7 @@
 export interface User {
   id: string;
   email: string;
-  firstName: string; 
+  firstName: string;
   lastName: string;
   phoneNumber: string | null;
   streetAddress: string | null;
@@ -13,7 +13,7 @@ export interface User {
   postalCode: string | null;
   location: string | null;
   provider?: string | null;
-  createdAt: string; 
+  createdAt: string;
 }
 
 // --- 2. Define the Listing Structure ---
@@ -23,12 +23,12 @@ export interface Listing {
   description: string;
   category: string;
   subCategory: string | null;
-  
+
   // Pricing Algo Fields (Must be number/string to match DB)
   originalPrice: number;
   purchaseYear: number;
   condition: string;
-  
+
   // Valuation & Result
   isValuated: boolean;
   valuationPrice: number | null;
@@ -38,12 +38,12 @@ export interface Listing {
   city: string;
   zipCode: string | null;
   imageUrls: string[];
-  receiptUrl: string | null; 
+  receiptUrl: string | null;
 
-  collectionDeadline: string; 
-  
+  collectionDeadline: string;
+
   createdAt: string;
-  
+
   // Included User details
   user: {
     id: string;

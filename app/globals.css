@@ -8,6 +8,6 @@
 /* 2. Custom Global Styles */
 /* These rules apply basic font and background color styles to the whole page */
 body {
-    /* Sets a light gray background and default text color */
-    @apply bg-gray-50 text-gray-900 antialiased;
+  /* Sets a light gray background and default text color */
+  @apply bg-gray-50 text-gray-900 antialiased;
 }

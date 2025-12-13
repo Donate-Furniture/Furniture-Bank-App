@@ -1,110 +1,145 @@
-// 1. GENERATOR: Configures the Prisma Client (the type-safe library we will use to query the database)
+// 1. CONFIGURATION
 generator client {
   provider = "prisma-client-js"
 }
 
-// 2. DATASOURCE: Connects to your PostgreSQL database using the URI in .env.local
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// ------------------------------------------------
-// CORE MODELS
-// ------------------------------------------------
+// --------------------------------------
+// 2. USER MODEL (The Core Identity)
+// --------------------------------------
 
-// The User Model: Stores all user information
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String?   // Password is optional (Social users won't have one)
+  id       String  @id @default(uuid())
+  email    String  @unique
+  // Password is optional (?) because users logging in via Google/Facebook won't have one.
+  password String?
 
-  //Fields to identify social login users
-  provider      String?   // e.g., "google", "facebook", "credentials" (for email/pass)
-  providerId    String?   // The unique ID returned by the social platform
-  
-  //Contact & Address Fields
-  firstName     String
-  lastName      String
+  firstName String?
+  lastName  String?
 
+  // Profile Details (Added for the donation receipt logic)
   phoneNumber   String?
   streetAddress String?
-  postalCode    String?
   city          String?
   province      String?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  postalCode    String?
 
-  // Relations
-  listings      Listing[]
-  accounts      Account[] // Relation to NextAuth Account
-  sessions      Session[] // Relation to NextAuth Session
+  // Metadata for OAuth (e.g., 'google', 'facebook')
+  provider   String?
+  providerId String?
 
-  // Messaging Relations
-  sentMessages     Message[]  @relation("SentMessages")
-  receivedMessages Message[]  @relation("ReceivedMessages")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@map("users")
+  // RELATIONSHIPS
+  // One user can have many listings
+  listings Listing[]
+
+  // One user can have many accounts/sessions (Required for NextAuth)
+  accounts Account[]
+  sessions Session[]
+
+  // Messaging: A user can be the sender OR the recipient
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  @@map("users") // Takes this model and names the actual DB table "users"
 }
 
-// The User Model: Stores all listing information
+// --------------------------------------
+// 3. LISTING MODEL (The Item)
+// --------------------------------------
+
 model Listing {
-  id              String    @id @default(uuid())
-  title           String    @db.VarChar(255)
-  description     String
-  category        String    
-  subCategory     String?   
+  id          String  @id @default(uuid())
+  title       String  @db.VarChar(255)
+  description String
+  category    String // e.g., 'Furniture', 'Vehicles'
+  subCategory String? // e.g., 'Desk', 'Sedan'
 
-  originalPrice   Float     // The Bill Price
-  purchaseYear    Int       // To calculate Age
-  condition       String    // 'like_new', 'excellent', 'well_used'
-  
-  // Valuation & Result
-  isValuated      Boolean   @default(false) 
-  valuationPrice  Float?    // Professional appraisal (Overrides algo)
-  estimatedValue  Float?    // ThQe FINAL calculated price to show (Algo result OR Valuation)
+  // PRICING ALGORITHM FIELDS
+  // These are the raw inputs used to calculate value
+  originalPrice Float
+  purchaseYear  Int
+  condition     String // 'new', 'used_like_new', 'used'
 
-  // REMOVED: price Float? (User asking price is gone)
-  
-  status          String    @default("available") 
-  city            String
-  zipCode         String?
-  
-  
-  imageUrls       String[]  // Main item photos (Min 4)
-  receiptUrl      String?   // Separate receipt photo
+  // VALUATION & RESULT
+  isValuated     Boolean @default(false)
+  valuationPrice Float? // If set, this overrides the algorithm
+  estimatedValue Float? // The final number shown on the tax receipt
 
-  collectionDeadline DateTime
-  
-  userId          String
-  user            User      @relation(fields: [userId], references: [id]) 
+  status String @default("available") // 'available', 'on_hold', 'donated'
 
-  messages        Message[]
+  // LOGISTICS
+  city               String
+  zipCode            String?
+  collectionDeadline DateTime // When does it need to be gone by?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  // IMAGES
+  imageUrls  String[] // Array of Vercel Blob URLs
+  receiptUrl String? // URL for the proof of purchase image
+
+  // RELATIONSHIPS
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  messages Message[] // Messages specifically about this item
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("listings")
 }
 
 // --------------------------------------
-// 3. NEXTAUTH MODELS
+// 4. MESSAGING MODEL
 // --------------------------------------
 
+model Message {
+  id      String @id @default(uuid())
+  content String @db.Text
+
+  // LINKING PEOPLE
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+
+  recipientId String
+  recipient   User   @relation("ReceivedMessages", fields: [recipientId], references: [id])
+
+  // LINKING CONTEXT
+  // We link the message to a listing so we know WHAT they are talking about
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("messages")
+}
+
+// --------------------------------------
+// 5. NEXTAUTH MODELS (Boilerplate)
+// --------------------------------------
+// These three tables (Account, Session, VerificationToken) are strictly required
+// by the NextAuth Prisma Adapter to handle social logins and sessions.
+
 model Account {
-  id                 String  @id @default(uuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String? @db.Text
-  access_token       String? @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String? @db.Text
-  session_state      String?
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -118,7 +153,7 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@map("sessions")
 }
 
@@ -129,30 +164,4 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
-}
-
-// --------------------------------------
-// 4. MESSAGING MODEL
-// --------------------------------------
-
-model Message {
-  id          String   @id @default(uuid())
-  content     String   @db.Text
-  
-  // Who sent it
-  senderId    String
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  
-  // Who received it
-  recipientId String
-  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
-  
-  // Context (Which item is this about?)
-  listingId   String?
-  listing     Listing? @relation(fields: [listingId], references: [id])
-
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  @@map("messages")
 }
