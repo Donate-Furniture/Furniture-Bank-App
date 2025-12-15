@@ -276,66 +276,37 @@ function ListingContent() {
           )}
         </div>
 
-        {/* Right Column */}
+      {/* Right Column (Item Details) */}
         <div className="md:w-1/2 pt-6 md:pt-0">
-          <div className="flex justify-between items-start mb-4">
-            <span className="text-sm font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
-              {listing.category}
-            </span>
-            {getStatusBadge(listing.status)}
-          </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-2">
-            {listing.title}
-          </h1>
+             <div className="flex justify-between items-start mb-4">
+                <span className="text-sm font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">{listing.category}</span>
+                {getStatusBadge(listing.status)}
+            </div>
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{listing.title}</h1>
+            
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-800 uppercase font-semibold">Estimated Fair Market Value (FMV)*</p>
+                <p className="text-3xl font-extrabold text-green-700">{taxValue}</p>
+                {listing.isValuated && <span className="text-xs text-green-600 block mt-1">✓ Professionally Valuated</span>}
+            </div>
 
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            {/* UPDATED LABEL */}
-            <p className="text-xs text-green-800 uppercase font-semibold">
-              Estimated Fair Market Value (FMV)*
+            <div className="mb-6 text-sm text-gray-500 space-y-1">
+                {/* ✅ FIX: Hide Bill Price if category is Antique */}
+                {listing.category !== 'Antique' && (
+                    <p>Original Bill: <span className="font-medium text-gray-800">${listing.originalPrice?.toFixed(2)}</span></p>
+                )}
+                
+                <p>Condition: <span className="font-medium text-gray-800 capitalize">{listing.condition.replace('_', ' ')}</span></p>
+                <p className="mt-2 font-medium text-red-600">Pickup Deadline: {new Date(listing.collectionDeadline).toLocaleDateString()}</p>
+            </div>
+            
+            <h2 className="text-xl font-semibold text-gray-800 mb-2 border-b pb-1">Description</h2>
+            <p className="text-gray-600 whitespace-pre-wrap mb-6">{listing.description}</p>
+            <p className="text-sm text-gray-500 mt-4">Posted {timeAgo(listing.createdAt)}</p>
+            
+            <p className="text-xs text-gray-400 italic mt-8 border-t pt-2">
+                *This is an estimate based on standard depreciation. The final tax receipt amount is determined by the registered charity accepting the donation.
             </p>
-            <p className="text-3xl font-extrabold text-green-700">{taxValue}</p>
-            {listing.isValuated && (
-              <span className="text-xs text-green-600 block mt-1">
-                ✓ Professionally Valuated
-              </span>
-            )}
-          </div>
-
-          <div className="mb-6 text-sm text-gray-500 space-y-1">
-            <p>
-              Original Bill:{" "}
-              <span className="font-medium text-gray-800">
-                ${listing.originalPrice?.toFixed(2)}
-              </span>
-            </p>
-            <p>
-              Condition:{" "}
-              <span className="font-medium text-gray-800 capitalize">
-                {listing.condition.replace("_", " ")}
-              </span>
-            </p>
-            <p className="mt-2 font-medium text-red-600">
-              Pickup Deadline:{" "}
-              {new Date(listing.collectionDeadline).toLocaleDateString()}
-            </p>
-          </div>
-
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 border-b pb-1">
-            Description
-          </h2>
-          <p className="text-gray-600 whitespace-pre-wrap mb-6">
-            {listing.description}
-          </p>
-          <p className="text-sm text-gray-500 mt-4">
-            Posted {timeAgo(listing.createdAt)}
-          </p>
-
-          {/* ADDED DISCLAIMER */}
-          <p className="text-xs text-gray-400 italic mt-8 border-t pt-2">
-            *This is an estimate based on standard depreciation. The final tax
-            receipt amount is determined by the registered charity accepting the
-            donation.
-          </p>
         </div>
       </div>
     </div>

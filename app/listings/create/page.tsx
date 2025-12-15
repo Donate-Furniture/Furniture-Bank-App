@@ -24,7 +24,6 @@ export default function CreateListingPage() {
     originalPrice: '', purchaseYear: CURRENT_YEAR.toString(), 
     condition: 'new', city: '', zipCode: '', 
     isValuated: false, valuationPrice: '', collectionDeadline: '',
-    
     imageUrls: [] as string[],
     receiptUrl: [] as string[],
     valuationDocUrl: [] as string[],
@@ -33,11 +32,18 @@ export default function CreateListingPage() {
   const [liveEstimate, setLiveEstimate] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAnalyzingPrice, setIsAnalyzingPrice] = useState(false);
+
+  // Logic to determine if high value rule is triggered
+  const isHighValue = parseFloat(formData.originalPrice) >= 1000;
 
   useEffect(() => {
     const price = parseFloat(formData.originalPrice);
     const year = parseInt(formData.purchaseYear);
+
+    if (formData.category === 'Vehicles' && formData.condition === 'scrap') {
+        setLiveEstimate(350);
+        return;
+    }
     
     if (isNaN(price) || isNaN(year)) { setLiveEstimate(null); return; }
     if (formData.isValuated && formData.valuationPrice) { setLiveEstimate(parseFloat(formData.valuationPrice)); return; }
@@ -73,43 +79,6 @@ export default function CreateListingPage() {
     }
   });
 
-  // OCR handler
-  const handleAnalyzeReceiptPrice = async () => {
-    if (formData.receiptUrl.length === 0) {
-        setError('Please upload at least one receipt image before analyzing.');
-        return;
-    }
-
-    setIsAnalyzingPrice(true);
-    setError('');
-
-    try {
-        const res = await fetch('/api/ocr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ receiptUrl: formData.receiptUrl }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            throw new Error(data.error || 'Failed to analyze receipt.');
-        }
-
-        const extractedPrice = data.price.toFixed(2);
-        
-        // Update the form field
-        setFormData(prev => ({ ...prev, originalPrice: extractedPrice.toString() }));
-        alert(`Price detected: $${extractedPrice}. The 'Original Bill' field has been updated.`);
-
-    } catch (err: any) {
-        setError(err.message);
-        alert(`OCR Error: ${err.message}`);
-    } finally {
-        setIsAnalyzingPrice(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -121,10 +90,26 @@ export default function CreateListingPage() {
         return;
     }
 
+    if (isHighValue && (!formData.isValuated || formData.valuationDocUrl.length === 0)) {
+        setError("High-value items ($1000+) require professional valuation and documentation.");
+        setIsSubmitting(false);
+        return;
+    }
+
+    // "Valuation Document required if Valuated"
     if (parseFloat(formData.originalPrice) > 999 && formData.isValuated && formData.valuationDocUrl.length === 0) {
         setError("Please upload at least one valuation document.");
         setIsSubmitting(false);
         return;
+    }
+
+    // "If not Antique, Estimated Value cannot exceed Original Price"
+    if (formData.category !== 'Antique' && liveEstimate !== null) {
+        if (liveEstimate > parseFloat(formData.originalPrice)) {
+            setError("The appraised value cannot be higher than the original bill price.");
+            setIsSubmitting(false);
+            return;
+        }
     }
 
     try {
@@ -155,80 +140,53 @@ export default function CreateListingPage() {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* Photos & Documents Section */}
+        {/* 1. Item Photos (Top) */}
         <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">1. Photos & Documents</h3>
-            <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Item Photos (Min 4)</label>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">1. Item Photos</h3>
+            <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Upload at least 4 photos</label>
                 <ImageUpload value={formData.imageUrls} {...createUploadHandlers('imageUrls')} />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Receipts / Proofs (Optional)</label>
-                    <ImageUpload value={formData.receiptUrl} {...createUploadHandlers('receiptUrl')} />
-                    
-                    {/* OCR Button */}
-                    {formData.receiptUrl.length > 0 && (
-                        <button 
-                            type="button" 
-                            onClick={handleAnalyzeReceiptPrice}
-                            disabled={isAnalyzingPrice}
-                            className="mt-3 w-full flex items-center justify-center py-2 px-4 border border-blue-500 rounded-md shadow-sm text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 disabled:opacity-70 transition"
-                        >
-                            {isAnalyzingPrice ? (
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 16.5M10.5 14.25v2.25m2.25-4.5v4.5m-4.5-4.5v4.5M18 7.5v1.5m-3.75 3.75v3m0 0v1.5m0-1.5h-1.5m1.5 0h1.5m0-1.5v1.5m0 0h-1.5m1.5 0h1.5" />
-                                </svg>
-                            )}
-                            {isAnalyzingPrice ? 'Analyzing...' : 'Analyze Receipt Price'}
-                        </button>
-                    )}
-                </div>
-                
-                {formData.isValuated && (
-                    <div>
-                        <label className="block text-sm font-medium text-indigo-700 mb-2">Valuation Documents (Required)</label>
-                        <ImageUpload value={formData.valuationDocUrl} {...createUploadHandlers('valuationDocUrl')} />
-                    </div>
-                )}
+                <p className="text-xs text-gray-500 mt-2">{formData.imageUrls.length} / 4 required.</p>
             </div>
         </div>
 
-        {/* Value Calculator */}
-        <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">Value Calculator</h3>
+        {/* 2. Basic Details */}
+        <div className="space-y-4">
+             <div><label className="block text-sm font-medium text-gray-700">Title</label><input name="title" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.title} onChange={handleChange} /></div>
+             <div><label className="block text-sm font-medium text-gray-700">Description</label><textarea name="description" required rows={3} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.description} onChange={handleChange} /></div>
+             <div className="flex gap-4">
+                <div className="w-1/2"><label className="block text-sm font-medium text-gray-700">Category</label><select name="category" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.category} onChange={handleChange}>{MAIN_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
+                <div className="w-1/2"><label className="block text-sm font-medium text-gray-700">Sub Category</label><input name="subCategory" type="text" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.subCategory} onChange={handleChange} /></div>
             </div>
-            
-            <div className="flex gap-4">
+        </div>
+
+        {/* 3. Value Calculator & Receipt */}
+        <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 space-y-6">
+             <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wide">Value Calculator</h3>
+             
+             <div className="flex gap-4">
                 <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700">Original Bill ($)</label>
-                    <input 
-                        name="originalPrice" 
-                        type="number" 
-                        required 
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" 
-                        value={formData.originalPrice} 
-                        onChange={handleChange} 
-                    />
+                    <input name="originalPrice" type="number" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.originalPrice} onChange={handleChange} />
                 </div>
-                {/* ... (Purchase Year and Condition inputs remain the same) ... */}
                 <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700">Year Bought</label>
-                    <input name="purchaseYear" type="number" min="1900" max={CURRENT_YEAR} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.purchaseYear} onChange={handleChange} />
+                    <input name="purchaseYear" type="number" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.purchaseYear} onChange={handleChange} />
                 </div>
                 <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700">Condition</label>
                     <select name="condition" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.condition} onChange={handleChange}>
-                        <option value="new">New</option><option value="used_like_new">Used Like New</option><option value="used">Used</option>
+                        <option value="new">New</option>
+                        <option value="used_like_new">Used Like New</option>
+                        <option value="used">Used</option>
+                        {formData.category === 'Vehicles' && (
+                            <option value="scrap" className="font-bold text-red-600">Scrap (Value $350)</option>
+                        )}
                     </select>
                 </div>
             </div>
 
-            <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+            <div className="p-3 bg-white rounded-lg border border-blue-200">
                 <div className="flex justify-between items-center mb-1">
                     <span className="text-gray-600 font-medium">Estimated Fair Market Value (FMV)*:</span>
                     <span className="text-2xl font-bold text-green-600">
@@ -236,23 +194,54 @@ export default function CreateListingPage() {
                     </span>
                 </div>
                 <p className="text-xs text-gray-500 italic">
-                    *This is an estimate based on standard depreciation. The final tax receipt amount is determined by the registered charity accepting the donation.
+                    *Estimate based on standard depreciation.
                 </p>
             </div>
-        </div>
-        {/* ... (Rest of Form: Valuation, Logistics, Submit) ... */}
-         <div className="space-y-4 py-2 border-t border-gray-100">
-            <div className="flex items-center">
-                <input id="isValuated" name="isValuated" type="checkbox" className="h-4 w-4 text-indigo-600 border-gray-300 rounded" checked={formData.isValuated} onChange={handleValuationChange} />
-                <label htmlFor="isValuated" className="ml-2 block text-sm font-medium text-gray-700">Has Professional Valuation?</label>
+
+            {/* Receipt Upload Under Calculator */}
+            <div className="border-t border-blue-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Receipt / Proof of Value (Optional)</label>
+                <ImageUpload value={formData.receiptUrl} {...createUploadHandlers('receiptUrl')} />
             </div>
+        </div>
+
+        {/* 4. Valuation Section */}
+        {/*LOGIC: Turn background red if high value but not valuated */}
+        <div className={`p-5 rounded-xl border transition-colors ${
+            isHighValue && !formData.isValuated 
+            ? 'bg-red-50 border-red-300 ring-2 ring-red-200' // Alert State
+            : 'bg-gray-50 border-gray-200'
+        }`}>
+            <div className="flex items-start">
+                <div className="flex items-center h-5">
+                    <input id="isValuated" name="isValuated" type="checkbox" className="h-4 w-4 text-indigo-600 border-gray-300 rounded" checked={formData.isValuated} onChange={handleValuationChange} />
+                </div>
+                <div className="ml-3 text-sm">
+                    <label htmlFor="isValuated" className="font-medium text-gray-700">Has Professional Valuation?</label>
+                    {isHighValue && (
+                        <p className="text-red-600 font-bold mt-1">Required for items valued over $1000.</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Valuation Upload inside this section */}
             {formData.isValuated && (
-                <div><input name="valuationPrice" type="number" className="mt-1 block w-full px-3 py-2 border border-indigo-300 rounded-md" value={formData.valuationPrice} onChange={handleChange} required={formData.isValuated} /></div>
+                <div className="mt-4 pl-7 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-indigo-700">Appraised Value ($)</label>
+                        <input name="valuationPrice" type="number" placeholder="Enter amount" className="mt-1 block w-full px-3 py-2 border border-indigo-300 rounded-md" value={formData.valuationPrice} onChange={handleChange} required={formData.isValuated} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-indigo-700 mb-2">Upload Valuation Document (Required)</label>
+                        <ImageUpload value={formData.valuationDocUrl} {...createUploadHandlers('valuationDocUrl')} />
+                    </div>
+                </div>
             )}
         </div>
 
+        {/* 5. Logistics */}
         <div className="flex gap-4">
-          <input name="city" type="text" required className="w-1/2 mt-1 block px-3 py-2 border border-gray-300 rounded-md" value={formData.city} onChange={handleChange} />
+          <input name="city" type="text" placeholder="City" required className="w-1/2 mt-1 block px-3 py-2 border border-gray-300 rounded-md" value={formData.city} onChange={handleChange} />
           <input name="collectionDeadline" type="date" required min={getMinDate()} className="w-1/2 mt-1 block px-3 py-2 border border-gray-300 rounded-md" value={formData.collectionDeadline} onChange={handleChange} />
         </div>
 

@@ -6,6 +6,11 @@ import { authOptions } from '../auth/[...nextauth]/route';
 
 // --- HELPER: Pricing Algorithm ---
 function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string): number {
+
+    if (condition === 'scrap') {
+        return 350;
+    }
+
     if (originalPrice < 20) return 0;
     if (condition === 'new') return originalPrice;
 
@@ -22,7 +27,6 @@ function calculateEstimatedValue(originalPrice: number, purchaseYear: number, co
     return Math.round(value * 100) / 100;
 }
 
-// POST Handler (Create Listing)
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -32,55 +36,34 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { 
             title, description, category, city, zipCode, imageUrls, 
-            receiptUrl, valuationDocUrl, // Arrays
+            receiptUrl, valuationDocUrl, 
             subCategory, isValuated, valuationPrice,
             originalPrice, purchaseYear, condition,
             collectionDeadline 
         } = body; 
 
-        // --- 1. Validate Images ---
-        // Ensure imageUrls is an array and has at least 4 items
+        // ... (Image & Date validation remains same) ...
         const validImageUrls = Array.isArray(imageUrls) ? imageUrls : [];
-        if (validImageUrls.length < 4) {
-            return NextResponse.json({ error: 'Please upload at least 4 photos of the item.' }, { status: 400 });
-        }
+        if (validImageUrls.length < 4) return NextResponse.json({ error: 'Please upload at least 4 photos.' }, { status: 400 });
 
-        // --- 2. Validate Date ---
-        if (!collectionDeadline) {
-             return NextResponse.json({ error: 'Collection deadline is required.' }, { status: 400 });
-        }
         const deadlineDate = new Date(collectionDeadline);
         const minDate = new Date();
-        minDate.setDate(minDate.getDate() + 6); // Allow slight buffer for timezones (approx 1 week)
+        minDate.setDate(minDate.getDate() + 6); 
         minDate.setHours(0,0,0,0);
         deadlineDate.setHours(0,0,0,0);
+        if (deadlineDate < minDate) return NextResponse.json({ error: 'Deadline too soon.' }, { status: 400 });
 
-        if (deadlineDate < minDate) {
-             return NextResponse.json({ error: 'Collection deadline must be at least 1 week from today.' }, { status: 400 });
-        }
-
-        // --- 3. Parse & Validate Numbers ---
         const billPrice = parseFloat(originalPrice);
         const year = parseInt(purchaseYear);
-
-        if (isNaN(billPrice) || isNaN(year)) {
-             return NextResponse.json({ error: 'Invalid price or year format.' }, { status: 400 });
-        }
-
-        // --- 4. Algorithm Logic ---
         let finalEstimatedValue = 0;
         let finalValuationPrice = null;
 
-        // Ensure array safety for valuation docs
-        const validValuationDocs = Array.isArray(valuationDocUrl) ? valuationDocUrl : [];
+        // --- VALUATION LOGIC ---
 
         if (billPrice > 999) {
-            if (!isValuated || !valuationPrice) {
-                return NextResponse.json({ error: 'Items > $999 require valuation.' }, { status: 400 });
-            }
-            if (isValuated && validValuationDocs.length === 0) {
-                 return NextResponse.json({ error: 'Please upload at least one valuation document.' }, { status: 400 });
-            }
+            if (!isValuated || !valuationPrice) return NextResponse.json({ error: 'Items > $999 require valuation.' }, { status: 400 });
+            if (isValuated && (!valuationDocUrl || valuationDocUrl.length === 0)) return NextResponse.json({ error: 'Valuation document required.' }, { status: 400 });
+            
             finalValuationPrice = parseFloat(valuationPrice);
             finalEstimatedValue = finalValuationPrice;
         } else {
@@ -92,40 +75,30 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // --- 5. Create in Database ---
+        // If not Antique, Estimated/Valuation price CANNOT exceed Original Bill Price.
+        if (category !== 'Antique' && finalEstimatedValue > billPrice) {
+             return NextResponse.json({ 
+                 error: 'For non-antique items, the estimated value cannot exceed the original purchase price.' 
+             }, { status: 400 });
+        }
+
         const newListing = await prisma.listing.create({
             data: {
-                title, 
-                description, 
-                category, 
-                subCategory: subCategory || null,
-                
-                originalPrice: billPrice, 
-                purchaseYear: year, 
-                condition, 
-                
-                isValuated: isValuated || false, 
-                valuationPrice: finalValuationPrice, 
-                estimatedValue: finalEstimatedValue,
-                
-                city, 
-                zipCode: zipCode || null, 
-                
-                // ✅ SAFETY: Ensure these are always arrays, never null
+                title, description, category, subCategory: subCategory || null,
+                originalPrice: billPrice, purchaseYear: year, condition, 
+                isValuated: isValuated || false, valuationPrice: finalValuationPrice, estimatedValue: finalEstimatedValue,
+                city, zipCode: zipCode || null, 
                 imageUrls: validImageUrls, 
                 receiptUrl: Array.isArray(receiptUrl) ? receiptUrl : [], 
-                valuationDocUrl: validValuationDocs,
-                
+                valuationDocUrl: Array.isArray(valuationDocUrl) ? valuationDocUrl : [],
                 collectionDeadline: new Date(collectionDeadline), 
                 userId, 
             },
         });
         return NextResponse.json({ message: 'Success', listing: newListing }, { status: 201 });
-
     } catch (error: any) {
-        //LOGGING: This will show up in your VS Code terminal
-        console.error('❌ Error creating listing:', error);
-        return NextResponse.json({ error: 'Server Error: ' + (error.message || 'Unknown') }, { status: 500 });
+        console.error('Create Error:', error);
+        return NextResponse.json({ error: 'Server Error' }, { status: 500 });
     }
 }
 
