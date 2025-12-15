@@ -22,6 +22,25 @@ const timeAgo = (dateString: string): string => {
   return `${diffInDays} days ago`;
 };
 
+// Helper for Status Badge Styling
+const getStatusStyles = (status: string) => {
+  switch (status) {
+    case "donated":
+      return "bg-gray-800 text-white";
+    case "on_hold":
+      return "bg-yellow-400 text-yellow-900";
+    case "available":
+      return "bg-green-500 text-white";
+    default:
+      return "bg-gray-200 text-gray-800";
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  if (status === "on_hold") return "On Hold";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
 const ListingCard: React.FC<ListingProps> = ({ listing }) => {
   const imageUrl = listing.imageUrls[0];
   const formattedDate = timeAgo(listing.createdAt);
@@ -46,6 +65,14 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
                 "https://placehold.co/600x400/CCCCCC/333333?text=No+Image";
             }}
           />
+          {/* Status Badge Overlay */}
+          <div
+            className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold uppercase shadow-sm ${getStatusStyles(
+              listing.status
+            )}`}
+          >
+            {getStatusLabel(listing.status)}
+          </div>
         </div>
 
         <div className="p-4">

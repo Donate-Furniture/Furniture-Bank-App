@@ -276,7 +276,7 @@ function ListingContent() {
           )}
         </div>
 
-        {/* Right Column: Details (Same as before) */}
+        {/* Right Column */}
         <div className="md:w-1/2 pt-6 md:pt-0">
           <div className="flex justify-between items-start mb-4">
             <span className="text-sm font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
@@ -289,8 +289,9 @@ function ListingContent() {
           </h1>
 
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            {/* UPDATED LABEL */}
             <p className="text-xs text-green-800 uppercase font-semibold">
-              Estimated Tax Value
+              Estimated Fair Market Value (FMV)*
             </p>
             <p className="text-3xl font-extrabold text-green-700">{taxValue}</p>
             {listing.isValuated && (
@@ -328,13 +329,20 @@ function ListingContent() {
           <p className="text-sm text-gray-500 mt-4">
             Posted {timeAgo(listing.createdAt)}
           </p>
+
+          {/* ADDED DISCLAIMER */}
+          <p className="text-xs text-gray-400 italic mt-8 border-t pt-2">
+            *This is an estimate based on standard depreciation. The final tax
+            receipt amount is determined by the registered charity accepting the
+            donation.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// ✅ WRAPPER COMPONENT: Handles the Suspense Boundary required for useSearchParams
+// WRAPPER COMPONENT: Handles the Suspense Boundary required for useSearchParams
 export default function ListingDetailPageWrapper() {
   return (
     <Suspense

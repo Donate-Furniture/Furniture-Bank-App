@@ -117,6 +117,11 @@ export default function EditListingPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  //Handler for Status Buttons
+  const handleStatusChange = (newStatus: string) => {
+    setFormData({ ...formData, status: newStatus });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -190,21 +195,48 @@ export default function EditListingPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Status (Top priority for editing) */}
+        {/*Status (Top priority for editing) */}
+        {/*STATUS BUTTONS (Radio Style) */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Status
           </label>
-          <select
-            name="status"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            value={formData.status}
-            onChange={handleChange}
-          >
-            <option value="available">Available</option>
-            <option value="on_hold">On Hold (Reserved)</option>
-            <option value="donated">Donated (Completed)</option>
-          </select>
+          <div className="flex space-x-2">
+            {[
+              {
+                value: "available",
+                label: "Available",
+                color: "bg-green-600 hover:bg-green-700",
+              },
+              {
+                value: "on_hold",
+                label: "On Hold",
+                color: "bg-yellow-500 hover:bg-yellow-600",
+              },
+              {
+                value: "donated",
+                label: "Donated",
+                color: "bg-gray-600 hover:bg-gray-700",
+              },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button" // Prevent form submission
+                onClick={() => handleStatusChange(option.value)}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors border ${
+                  formData.status === option.value
+                    ? `${
+                        option.color
+                      } text-white border-transparent ring-2 ring-offset-1 ring-${
+                        option.color.split("-")[1]
+                      }-500` // Active State
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50" // Inactive State
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Title */}
@@ -253,7 +285,7 @@ export default function EditListingPage() {
             />
           </div>
           <div className="w-1/2">
-            {/* ✅ EDITABLE DEADLINE FIELD */}
+            {/* EDITABLE DEADLINE FIELD */}
             <label className="block text-sm font-medium text-gray-700">
               Latest Collection Date
             </label>

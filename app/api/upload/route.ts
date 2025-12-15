@@ -26,6 +26,9 @@ export async function POST(request: Request): Promise<NextResponse> {
             "image/gif",
             "image/webp",
           ],
+
+          //Add random suffix to prevent filename conflicts
+          addRandomSuffix: true, 
           tokenPayload: JSON.stringify({
             userId: (session.user as any).id, // Track who uploaded it
           }),

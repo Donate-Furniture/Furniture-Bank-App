@@ -81,7 +81,8 @@ model Listing {
 
   // IMAGES
   imageUrls  String[] // Array of Vercel Blob URLs
-  receiptUrl String? // URL for the proof of purchase image
+  receiptUrl      String[]  
+  valuationDocUrl String[]  
 
   // RELATIONSHIPS
   userId String

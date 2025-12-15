@@ -38,7 +38,8 @@ export interface Listing {
   city: string;
   zipCode: string | null;
   imageUrls: string[];
-  receiptUrl: string | null;
+  receiptUrl: string[]; 
+  valuationDocUrl: string[];
 
   collectionDeadline: string;
 
