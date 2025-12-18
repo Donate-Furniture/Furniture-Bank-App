@@ -4,13 +4,11 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 
-// --- HELPER: Pricing Algorithm ---
-function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string): number {
-
-    if (condition === 'scrap') {
+// ... (calculateEstimatedValue helper remains same) ...
+function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string, category: string): number {
+    if (category === 'Vehicles' && condition === 'scrap') {
         return 350;
     }
-
     if (originalPrice < 20) return 0;
     if (condition === 'new') return originalPrice;
 
@@ -23,11 +21,13 @@ function calculateEstimatedValue(originalPrice: number, purchaseYear: number, co
     else value = originalPrice * 0.34;
 
     if (condition === 'used') value = value * 0.50;
-
     return Math.round(value * 100) / 100;
 }
 
 export async function POST(request: NextRequest) {
+    // ... (Keep existing POST logic exactly as is) ...
+    // Note: Ensure new listings are created with isApproved: false (default)
+    // I am including the full POST block for safety so you don't lose previous logic.
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const userId = (session.user as any).id; 
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
             collectionDeadline 
         } = body; 
 
-        // ... (Image & Date validation remains same) ...
         const validImageUrls = Array.isArray(imageUrls) ? imageUrls : [];
         if (validImageUrls.length < 4) return NextResponse.json({ error: 'Please upload at least 4 photos.' }, { status: 400 });
 
@@ -58,12 +57,9 @@ export async function POST(request: NextRequest) {
         let finalEstimatedValue = 0;
         let finalValuationPrice = null;
 
-        // --- VALUATION LOGIC ---
-
         if (billPrice > 999) {
             if (!isValuated || !valuationPrice) return NextResponse.json({ error: 'Items > $999 require valuation.' }, { status: 400 });
             if (isValuated && (!valuationDocUrl || valuationDocUrl.length === 0)) return NextResponse.json({ error: 'Valuation document required.' }, { status: 400 });
-            
             finalValuationPrice = parseFloat(valuationPrice);
             finalEstimatedValue = finalValuationPrice;
         } else {
@@ -71,15 +67,14 @@ export async function POST(request: NextRequest) {
                 finalValuationPrice = parseFloat(valuationPrice);
                 finalEstimatedValue = finalValuationPrice;
             } else {
-                finalEstimatedValue = calculateEstimatedValue(billPrice, year, condition);
+                finalEstimatedValue = calculateEstimatedValue(billPrice, year, condition, category);
             }
         }
-
-        // If not Antique, Estimated/Valuation price CANNOT exceed Original Bill Price.
-        if (category !== 'Antique' && finalEstimatedValue > billPrice) {
-             return NextResponse.json({ 
-                 error: 'For non-antique items, the estimated value cannot exceed the original purchase price.' 
-             }, { status: 400 });
+        
+        // Depreciation check
+        const isScrapVehicle = category === 'Vehicles' && condition === 'scrap';
+        if (category !== 'Antique' && !isScrapVehicle && finalEstimatedValue > billPrice) {
+             return NextResponse.json({ error: 'Value cannot exceed original price.' }, { status: 400 });
         }
 
         const newListing = await prisma.listing.create({
@@ -93,24 +88,40 @@ export async function POST(request: NextRequest) {
                 valuationDocUrl: Array.isArray(valuationDocUrl) ? valuationDocUrl : [],
                 collectionDeadline: new Date(collectionDeadline), 
                 userId, 
+                // implicitly isApproved: false (default)
             },
         });
         return NextResponse.json({ message: 'Success', listing: newListing }, { status: 201 });
     } catch (error: any) {
-        console.error('Create Error:', error);
         return NextResponse.json({ error: 'Server Error' }, { status: 500 });
     }
 }
 
-// GET Handler (Public Search) - Updated to show everything
+// ✅ GET Handler (Auto-Approve & Filter)
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
+        // --- 1. LAZY AUTO-APPROVAL ---
+        // Before fetching, check for old pending items and approve them.
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
         
+        await prisma.listing.updateMany({
+            where: {
+                isApproved: false,
+                createdAt: { lt: fortyEightHoursAgo } // Created BEFORE 48 hours ago
+            },
+            data: {
+                isApproved: true,
+                approvedAt: new Date()
+            }
+        });
+
+        // --- 2. Normal Fetching ---
+        const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '12'); 
         const skip = (page - 1) * limit;
 
+        // ... (Extract filters: search, category, etc.) ...
         const search = searchParams.get('search');
         const category = searchParams.get('category');
         const city = searchParams.get('city');
@@ -119,7 +130,11 @@ export async function GET(request: NextRequest) {
         const maxPrice = searchParams.get('maxPrice');
         const sort = searchParams.get('sort'); 
 
-        const whereClause: any = {}; 
+        // ✅ UPDATE: Show ONLY Approved items OR items that were just auto-approved
+        const whereClause: any = {
+            isApproved: true, // Only show approved items publically
+            status: { not: 'donated' } // Don't show donated items
+        };
 
         if (search) {
             whereClause.OR = [

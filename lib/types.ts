@@ -14,6 +14,8 @@ export interface User {
   location: string | null;
   provider?: string | null;
   createdAt: string;
+
+  role?: 'USER' | 'ADMIN';
 }
 
 // --- 2. Define the Listing Structure ---
