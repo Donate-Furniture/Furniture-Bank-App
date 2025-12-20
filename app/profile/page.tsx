@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MyListings from "@/app/components/MyListings";
 import { User } from "@/lib/types";
-import { Fruktur } from "next/font/google";
+import Link from 'next/link';
 
 // Helper function to safely format dates
 const formatDate = (dateString: string | undefined) => {
@@ -76,9 +76,16 @@ export default function ProfilePage() {
       </h1>
 
       <div className="bg-white p-6 shadow-xl rounded-xl border border-indigo-100 mb-10">
-        <h2 className="text-2xl font-semibold mb-4 text-indigo-600">
-          Account Information
-        </h2>
+         <div className="flex justify-between items-start mb-4">
+                    <h2 className="text-2xl font-semibold text-indigo-600">Account Information</h2>
+                    {/* Edit Button */}
+                    <Link 
+                        href="/profile/edit" 
+                        className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                        Edit Profile
+                    </Link>
+                </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
           <p>
             <span className="font-medium">Name:</span> {fullProfile?.firstName}{" "}
