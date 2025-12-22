@@ -47,7 +47,12 @@ export const authOptions: AuthOptions = {
         });
 
         if (!user || !user.password) {
-          throw new Error("Invalid credentials or user registered with social media");
+          throw new Error("Invalid credentials");
+        }
+
+        // ✅ CHECK BLOCK STATUS (Email Login)
+        if (user.isBlocked) {
+            throw new Error("Your account has been suspended. Contact support.");
         }
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
@@ -64,18 +69,31 @@ export const authOptions: AuthOptions = {
             lastName: user.lastName,
             city: user.city,          
             createdAt: user.createdAt,
-            //for admin
+            // @ts-ignore
             role: user.role, 
         };
       }
     })
   ],
 
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "jwt" },
 
   callbacks: {
+    // ✅ CHECK BLOCK STATUS (Social Login)
+    async signIn({ user }) {
+        if (!user.email) return false;
+        
+        // Fetch fresh user data from DB to check status
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email }
+        });
+
+        if (dbUser && dbUser.isBlocked) {
+            return false; // Blocks the sign in
+        }
+        return true;
+    },
+
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -88,7 +106,7 @@ export const authOptions: AuthOptions = {
         // @ts-ignore
         token.createdAt = user.createdAt;
         // @ts-ignore
-        token.role = user.role; // This will now work because 'user' has 'role'
+        token.role = user.role;
       }
       return token;
     },
@@ -113,6 +131,7 @@ export const authOptions: AuthOptions = {
   
   pages: {
     signIn: '/auth', 
+    error: '/auth', // Redirect back to auth on error
   },
   
   debug: process.env.NODE_ENV === 'development',

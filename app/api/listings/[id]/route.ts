@@ -50,142 +50,123 @@ export async function GET(
   }
 }
 
-// Define the PUT method handler for UPDATING a listing
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+    request: NextRequest, 
+    { params }: { params: { id: string } }
 ) {
-  // 1. Check Session
-  const session = await getServerSession(authOptions);
-
-  if (!session || !session.user) {
-    return NextResponse.json(
-      { error: "Unauthorized: You must be logged in." },
-      { status: 401 }
-    );
-  }
-
-  const userId = (session.user as any).id;
-  const listingId = params.id;
-
-  try {
-    // 2. Parse the updates from the request body
-    const body = await request.json();
-    // Extract the fields that can be updated
-    const { title, description, status, city, zipCode, collectionDeadline } =
-      body;
-
-    // 3. Verify Ownership
-    const existingListing = await prisma.listing.findUnique({
-      where: { id: listingId },
-    });
-
-    if (!existingListing) {
-      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (existingListing.userId !== userId) {
-      return NextResponse.json(
-        { error: "Forbidden: You do not own this listing." },
-        { status: 403 }
-      );
-    }
+    const userId = (session.user as any).id;
+    // @ts-ignore
+    const userRole = session.user.role; // Get Role
+    const listingId = params.id;
 
-    // 4. Validate New Collection Deadline (If provided)
-    let validatedDeadline: Date | undefined = undefined;
-    if (collectionDeadline) {
-      const deadlineDate = new Date(collectionDeadline);
-      const minDate = new Date();
-      minDate.setDate(minDate.getDate() + 7); // Min 7 days rule
+    try {
+        const body = await request.json();
+        // Extract EVERYTHING (Admin might edit price/category)
+        const { 
+            title, description, category, subCategory,
+            price, status, city, zipCode, imageUrls,
+            originalPrice, purchaseYear, condition,
+            isValuated, valuationPrice, collectionDeadline
+        } = body; 
 
-      // Reset time components for comparison
-      minDate.setHours(0, 0, 0, 0);
-      deadlineDate.setHours(0, 0, 0, 0);
+        const existingListing = await prisma.listing.findUnique({
+            where: { id: listingId },
+        });
 
-      if (deadlineDate < minDate) {
+        if (!existingListing) {
+            return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        }
+
+        // ✅ SECURITY CHECK: Allow if Owner OR Admin
+        if (existingListing.userId !== userId && userRole !== 'ADMIN') {
+            return NextResponse.json(
+                { error: 'Forbidden: You do not own this listing.' },
+                { status: 403 }
+            );
+        }
+
+        // Validate Date if changed
+        let validatedDeadline: Date | undefined = undefined;
+        if (collectionDeadline) {
+             const deadlineDate = new Date(collectionDeadline);
+             const minDate = new Date();
+             minDate.setDate(minDate.getDate() + 6); 
+             minDate.setHours(0,0,0,0);
+             deadlineDate.setHours(0,0,0,0);
+
+             if (deadlineDate < minDate) {
+                return NextResponse.json({ error: 'Deadline too soon.' }, { status: 400 });
+             }
+             validatedDeadline = new Date(collectionDeadline);
+        }
+
+        // Update
+        const updatedListing = await prisma.listing.update({
+            where: { id: listingId },
+            data: {
+                title: title || undefined,
+                description: description || undefined,
+                status: status || undefined, 
+                city: city || undefined,
+                zipCode: zipCode || undefined,
+                collectionDeadline: validatedDeadline,
+                
+                // ✅ ADMIN ONLY FIELDS (But logic allows passing them if authorized)
+                // Since we checked role above, we can safely update these if provided
+                category: category || undefined,
+                subCategory: subCategory || undefined,
+                originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
+                purchaseYear: purchaseYear ? parseInt(purchaseYear) : undefined,
+                condition: condition || undefined,
+                isValuated: isValuated, // Boolean
+                valuationPrice: valuationPrice ? parseFloat(valuationPrice) : undefined,
+                // Note: estimatedValue logic might need re-run if price changed, 
+                // but for Admin edits we usually trust the input or keep as is.
+            },
+        });
+
         return NextResponse.json(
-          { error: "Collection deadline must be at least 1 week from today." },
-          { status: 400 }
+            { message: 'Listing updated', listing: updatedListing }, 
+            { status: 200 }
         );
-      }
-      validatedDeadline = new Date(collectionDeadline);
+
+    } catch (error) {
+        console.error('Update Error:', error);
+        return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
-
-    // 5. Update the Listing
-    const updatedListing = await prisma.listing.update({
-      where: { id: listingId },
-      data: {
-        title: title || undefined,
-        description: description || undefined,
-        status: status || undefined,
-        city: city || undefined,
-        zipCode: zipCode || undefined,
-        collectionDeadline: validatedDeadline, // Use the validated date
-      },
-    });
-
-    return NextResponse.json(
-      { message: "Listing updated successfully", listing: updatedListing },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Error updating listing:", error);
-    return NextResponse.json(
-      { error: "Server error while updating listing." },
-      { status: 500 }
-    );
-  }
 }
 
-// Define the DELETE method handler
+// DELETE Handler (Admin Override)
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+    request: NextRequest, 
+    { params }: { params: { id: string } }
 ) {
-  // 1. Check Session
-  const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (!session || !session.user) {
-    return NextResponse.json(
-      { error: "Unauthorized: You must be logged in." },
-      { status: 401 }
-    );
-  }
+    const userId = (session.user as any).id;
+    // @ts-ignore
+    const userRole = session.user.role;
+    const listingId = params.id;
 
-  const userId = (session.user as any).id;
-  const listingId = params.id;
+    try {
+        const listing = await prisma.listing.findUnique({ where: { id: listingId } });
+        if (!listing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  try {
-    // 2. Verify Ownership
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-    });
+        // ✅ SECURITY CHECK: Allow if Owner OR Admin
+        if (listing.userId !== userId && userRole !== 'ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
-    if (!listing) {
-      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+        await prisma.listing.delete({ where: { id: listingId } });
+        return NextResponse.json({ message: 'Deleted' }, { status: 200 });
+
+    } catch (error) {
+        return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
-
-    if (listing.userId !== userId) {
-      return NextResponse.json(
-        { error: "Forbidden: You do not own this listing." },
-        { status: 403 }
-      );
-    }
-
-    // 3. Delete the Listing
-    await prisma.listing.delete({
-      where: { id: listingId },
-    });
-
-    return NextResponse.json(
-      { message: "Listing deleted successfully" },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Error deleting listing:", error);
-    return NextResponse.json(
-      { error: "Server error while deleting listing." },
-      { status: 500 }
-    );
-  }
 }

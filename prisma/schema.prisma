@@ -56,6 +56,8 @@ model User {
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
+  isBlocked     Boolean   @default(false)
+
   @@map("users") // Takes this model and names the actual DB table "users"
 }
 

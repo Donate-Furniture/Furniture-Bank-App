@@ -3,6 +3,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
+import { hashPassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,17 +23,12 @@ export async function GET(request: NextRequest) {
     try {
         const whereClause: any = {};
         
-        // ✅ UPDATED SEARCH LOGIC: Search everything
         if (search) {
             whereClause.OR = [
                 { email: { contains: search, mode: 'insensitive' } },
                 { firstName: { contains: search, mode: 'insensitive' } },
                 { lastName: { contains: search, mode: 'insensitive' } },
                 { phoneNumber: { contains: search, mode: 'insensitive' } },
-                { city: { contains: search, mode: 'insensitive' } },
-                { streetAddress: { contains: search, mode: 'insensitive' } },
-                { province: { contains: search, mode: 'insensitive' } },
-                { postalCode: { contains: search, mode: 'insensitive' } },
             ];
         }
 
@@ -61,6 +57,51 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error) {
+        return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    }
+}
+
+// ✅ NEW: Create User (Admin Only)
+export async function POST(request: NextRequest) {
+    const session = await getServerSession(authOptions);
+    // @ts-ignore
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    try {
+        const body = await request.json();
+        const { 
+            email, password, firstName, lastName, role, 
+            phoneNumber, streetAddress, city, province, postalCode 
+        } = body;
+
+        if (!email || !password || !firstName || !lastName) {
+            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return NextResponse.json({ error: 'User already exists' }, { status: 409 });
+        }
+
+        const hashedPassword = await hashPassword(password);
+
+        const newUser = await prisma.user.create({
+            data: {
+                email: email.toLowerCase(),
+                password: hashedPassword,
+                firstName,
+                lastName,
+                role: role || 'USER', // Admin can assign roles
+                phoneNumber, streetAddress, city, province, postalCode,
+                provider: 'credentials',
+            }
+        });
+
+        return NextResponse.json({ user: newUser }, { status: 201 });
+    } catch (error) {
+        console.error('Create User Error:', error);
         return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
 }

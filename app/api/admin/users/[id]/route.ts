@@ -1,8 +1,11 @@
+// File: app/api/admin/users/[id]/route.ts
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
+import { hashPassword } from '@/lib/auth';
 
+// GET: Fetch Single User Data
 export async function GET(
     request: NextRequest, 
     { params }: { params: { id: string } }
@@ -14,9 +17,9 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'info'; // info, listings, messages
+    const type = searchParams.get('type') || 'info'; 
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = 5; // Smaller limit for sub-lists
+    const limit = 5; 
     const skip = (page - 1) * limit;
 
     try {
@@ -34,7 +37,6 @@ export async function GET(
         }
 
         if (type === 'messages') {
-             // Fetch messages sent OR received
              const [messages, total] = await prisma.$transaction([
                 prisma.message.findMany({
                     where: { OR: [{ senderId: params.id }, { recipientId: params.id }] },
@@ -51,7 +53,6 @@ export async function GET(
             return NextResponse.json({ data: messages, pagination: { total, page, totalPages: Math.ceil(total/limit) } });
         }
 
-        // Default: Basic Info
         const user = await prisma.user.findUnique({
             where: { id: params.id },
             include: {
@@ -63,6 +64,37 @@ export async function GET(
         return NextResponse.json({ user });
 
     } catch (error) {
+        return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    }
+}
+
+
+//DELETE (Remove User)
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    const session = await getServerSession(authOptions);
+    // @ts-ignore
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    try {
+        // Prevent deleting self
+        // @ts-ignore
+        if (params.id === session.user.id) {
+            return NextResponse.json({ error: 'Cannot delete your own admin account.' }, { status: 400 });
+        }
+
+        await prisma.user.delete({
+            where: { id: params.id }
+        });
+
+        return NextResponse.json({ success: true }, { status: 200 });
+
+    } catch (error) {
+        console.error('Delete User Error:', error);
         return NextResponse.json({ error: 'Server error' }, { status: 500 });
     }
 }
