@@ -39,11 +39,6 @@ export default function CreateListingPage() {
   useEffect(() => {
     const price = parseFloat(formData.originalPrice);
     const year = parseInt(formData.purchaseYear);
-
-    if (formData.category === 'Vehicles' && formData.condition === 'scrap') {
-        setLiveEstimate(350);
-        return;
-    }
     
     if (isNaN(price) || isNaN(year)) { setLiveEstimate(null); return; }
     if (formData.isValuated && formData.valuationPrice) { setLiveEstimate(parseFloat(formData.valuationPrice)); return; }
@@ -87,27 +82,26 @@ export default function CreateListingPage() {
     if (formData.imageUrls.length < 4) {
         setError("Minimum 4 item photos required.");
         setIsSubmitting(false);
+        // Scroll to bottom to ensure error is seen if form is long
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         return;
     }
 
     if (isHighValue && (!formData.isValuated || formData.valuationDocUrl.length === 0)) {
         setError("High-value items ($1000+) require professional valuation and documentation.");
         setIsSubmitting(false);
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         return;
     }
 
-    // "Valuation Document required if Valuated"
-    if (parseFloat(formData.originalPrice) > 999 && formData.isValuated && formData.valuationDocUrl.length === 0) {
-        setError("Please upload at least one valuation document.");
-        setIsSubmitting(false);
-        return;
-    }
-
-    // "If not Antique, Estimated Value cannot exceed Original Price"
-    if (formData.category !== 'Antique' && liveEstimate !== null) {
-        if (liveEstimate > parseFloat(formData.originalPrice)) {
-            setError("The appraised value cannot be higher than the original bill price.");
+    // ✅ New Validation: Antique Age Requirement
+    if (formData.category === 'Antique') {
+        const year = parseInt(formData.purchaseYear);
+        const age = CURRENT_YEAR - year;
+        if (age < 20) {
+            setError("Antiques must be at least 20 years old.");
             setIsSubmitting(false);
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             return;
         }
     }
@@ -128,6 +122,7 @@ export default function CreateListingPage() {
       router.push('/');
     } catch (err: any) {
       setError(err.message);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -136,7 +131,8 @@ export default function CreateListingPage() {
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-lg rounded-lg mt-10 mb-20">
       <h1 className="text-3xl font-bold mb-6 text-gray-800">Post a Donation</h1>
-      {error && <div className="bg-red-50 text-red-500 p-3 rounded mb-6 text-sm font-medium">{error}</div>}
+      
+      {/* Error removed from top */}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         
@@ -176,9 +172,7 @@ export default function CreateListingPage() {
                 <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700">Condition</label>
                     <select name="condition" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" value={formData.condition} onChange={handleChange}>
-                        <option value="new">New</option>
-                        <option value="used_like_new">Used Like New</option>
-                        <option value="used">Used</option>
+                        <option value="new">New</option><option value="used_like_new">Used Like New</option><option value="used">Used</option>
                         {formData.category === 'Vehicles' && (
                             <option value="scrap" className="font-bold text-red-600">Scrap (Value $350)</option>
                         )}
@@ -198,7 +192,6 @@ export default function CreateListingPage() {
                 </p>
             </div>
 
-            {/* Receipt Upload Under Calculator */}
             <div className="border-t border-blue-200 pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Receipt / Proof of Value (Optional)</label>
                 <ImageUpload value={formData.receiptUrl} {...createUploadHandlers('receiptUrl')} />
@@ -206,10 +199,9 @@ export default function CreateListingPage() {
         </div>
 
         {/* 4. Valuation Section */}
-        {/*LOGIC: Turn background red if high value but not valuated */}
         <div className={`p-5 rounded-xl border transition-colors ${
             isHighValue && !formData.isValuated 
-            ? 'bg-red-50 border-red-300 ring-2 ring-red-200' // Alert State
+            ? 'bg-red-50 border-red-300 ring-2 ring-red-200' 
             : 'bg-gray-50 border-gray-200'
         }`}>
             <div className="flex items-start">
@@ -224,7 +216,6 @@ export default function CreateListingPage() {
                 </div>
             </div>
 
-            {/* Valuation Upload inside this section */}
             {formData.isValuated && (
                 <div className="mt-4 pl-7 space-y-4">
                     <div>
@@ -245,7 +236,27 @@ export default function CreateListingPage() {
           <input name="collectionDeadline" type="date" required min={getMinDate()} className="w-1/2 mt-1 block px-3 py-2 border border-gray-300 rounded-md" value={formData.collectionDeadline} onChange={handleChange} />
         </div>
 
-        <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400">Post Donation</button>
+        {/* ✅ ERROR MESSAGE MOVED HERE (Above Button) */}
+        {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+                <div className="flex">
+                    <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <div className="ml-3">
+                        <p className="text-sm text-red-700 font-bold">
+                            {error}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400 transition-colors">
+          {isSubmitting ? 'Submitting Donation...' : 'Post Donation'}
+        </button>
       </form>
     </div>
   );

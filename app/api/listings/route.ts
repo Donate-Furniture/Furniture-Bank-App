@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 
-// ... (calculateEstimatedValue helper remains same) ...
+// --- HELPER: Pricing Algorithm ---
 function calculateEstimatedValue(originalPrice: number, purchaseYear: number, condition: string, category: string): number {
     if (category === 'Vehicles' && condition === 'scrap') {
         return 350;
@@ -21,13 +21,12 @@ function calculateEstimatedValue(originalPrice: number, purchaseYear: number, co
     else value = originalPrice * 0.34;
 
     if (condition === 'used') value = value * 0.50;
+
     return Math.round(value * 100) / 100;
 }
 
+// POST Handler (Create Listing)
 export async function POST(request: NextRequest) {
-    // ... (Keep existing POST logic exactly as is) ...
-    // Note: Ensure new listings are created with isApproved: false (default)
-    // I am including the full POST block for safety so you don't lose previous logic.
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const userId = (session.user as any).id; 
@@ -35,21 +34,24 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { 
-            title, description, category, city, zipCode, imageUrls, 
-            receiptUrl, valuationDocUrl, 
-            subCategory, isValuated, valuationPrice,
+            title, description, category, city, zipCode, imageUrls, receiptUrl, 
+            subCategory, isValuated, valuationPrice, valuationDocUrl,
             originalPrice, purchaseYear, condition,
             collectionDeadline 
         } = body; 
 
+        // 1. Validate Images
         const validImageUrls = Array.isArray(imageUrls) ? imageUrls : [];
         if (validImageUrls.length < 4) return NextResponse.json({ error: 'Please upload at least 4 photos.' }, { status: 400 });
 
+        // 2. Validate Date
+        if (!collectionDeadline) return NextResponse.json({ error: 'Deadline required.' }, { status: 400 });
         const deadlineDate = new Date(collectionDeadline);
         const minDate = new Date();
         minDate.setDate(minDate.getDate() + 6); 
         minDate.setHours(0,0,0,0);
         deadlineDate.setHours(0,0,0,0);
+
         if (deadlineDate < minDate) return NextResponse.json({ error: 'Deadline too soon.' }, { status: 400 });
 
         const billPrice = parseFloat(originalPrice);
@@ -57,9 +59,12 @@ export async function POST(request: NextRequest) {
         let finalEstimatedValue = 0;
         let finalValuationPrice = null;
 
+        // 3. Valuation Logic
+        const validValuationDocs = Array.isArray(valuationDocUrl) ? valuationDocUrl : [];
+
         if (billPrice > 999) {
             if (!isValuated || !valuationPrice) return NextResponse.json({ error: 'Items > $999 require valuation.' }, { status: 400 });
-            if (isValuated && (!valuationDocUrl || valuationDocUrl.length === 0)) return NextResponse.json({ error: 'Valuation document required.' }, { status: 400 });
+            if (isValuated && validValuationDocs.length === 0) return NextResponse.json({ error: 'Valuation doc required.' }, { status: 400 });
             finalValuationPrice = parseFloat(valuationPrice);
             finalEstimatedValue = finalValuationPrice;
         } else {
@@ -71,7 +76,6 @@ export async function POST(request: NextRequest) {
             }
         }
         
-        // Depreciation check
         const isScrapVehicle = category === 'Vehicles' && condition === 'scrap';
         if (category !== 'Antique' && !isScrapVehicle && finalEstimatedValue > billPrice) {
              return NextResponse.json({ error: 'Value cannot exceed original price.' }, { status: 400 });
@@ -85,43 +89,33 @@ export async function POST(request: NextRequest) {
                 city, zipCode: zipCode || null, 
                 imageUrls: validImageUrls, 
                 receiptUrl: Array.isArray(receiptUrl) ? receiptUrl : [], 
-                valuationDocUrl: Array.isArray(valuationDocUrl) ? valuationDocUrl : [],
+                valuationDocUrl: validValuationDocs,
                 collectionDeadline: new Date(collectionDeadline), 
                 userId, 
-                // implicitly isApproved: false (default)
             },
         });
         return NextResponse.json({ message: 'Success', listing: newListing }, { status: 201 });
-    } catch (error: any) {
+    } catch (error) {
         return NextResponse.json({ error: 'Server Error' }, { status: 500 });
     }
 }
 
-// ✅ GET Handler (Auto-Approve & Filter)
+// ✅ GET Handler (Public Search)
 export async function GET(request: NextRequest) {
     try {
-        // --- 1. LAZY AUTO-APPROVAL ---
-        // Before fetching, check for old pending items and approve them.
+        // 1. Lazy Auto-Approval
         const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-        
         await prisma.listing.updateMany({
-            where: {
-                isApproved: false,
-                createdAt: { lt: fortyEightHoursAgo } // Created BEFORE 48 hours ago
-            },
-            data: {
-                isApproved: true,
-                approvedAt: new Date()
-            }
+            where: { isApproved: false, createdAt: { lt: fortyEightHoursAgo } },
+            data: { isApproved: true, approvedAt: new Date() }
         });
 
-        // --- 2. Normal Fetching ---
         const { searchParams } = new URL(request.url);
+        
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '12'); 
         const skip = (page - 1) * limit;
 
-        // ... (Extract filters: search, category, etc.) ...
         const search = searchParams.get('search');
         const category = searchParams.get('category');
         const city = searchParams.get('city');
@@ -130,10 +124,11 @@ export async function GET(request: NextRequest) {
         const maxPrice = searchParams.get('maxPrice');
         const sort = searchParams.get('sort'); 
 
-        // ✅ UPDATE: Show ONLY Approved items OR items that were just auto-approved
+        // 2. Build Query
         const whereClause: any = {
-            isApproved: true, // Only show approved items publically
-            status: { not: 'donated' } // Don't show donated items
+            // ✅ FIX: Ensure ONLY approved listings are shown publicly
+            isApproved: true
+            // Note: We removed "status: { not: 'donated' }" so donated items CAN appear if they are approved.
         };
 
         if (search) {
