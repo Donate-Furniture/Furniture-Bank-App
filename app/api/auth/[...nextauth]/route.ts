@@ -1,4 +1,6 @@
-// File: app/api/auth/[...nextauth]/route.ts
+// NextAuth Configuration: Central authentication handler supporting Social Providers (Google, Facebook, Apple, Twitter) and Email/Password.
+// Includes critical logic to reject banned users and persist custom user fields (role, city, etc.) into the session.
+
 import NextAuth, { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
@@ -11,8 +13,9 @@ import * as bcrypt from "bcryptjs";
 
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
-  
+
   providers: [
+    // --- Social Providers ---
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -30,12 +33,13 @@ export const authOptions: AuthOptions = {
       clientSecret: process.env.TWITTER_CLIENT_SECRET || "",
       version: "2.0",
     }),
-    
+
+    // --- Email/Password Logic ---
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -43,57 +47,62 @@ export const authOptions: AuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() }
+          where: { email: credentials.email.toLowerCase() },
         });
 
         if (!user || !user.password) {
           throw new Error("Invalid credentials");
         }
 
-        // ✅ CHECK BLOCK STATUS (Email Login)
+        // 1. Guard: Reject login if user is marked as blocked in DB
         if (user.isBlocked) {
-            throw new Error("Your account has been suspended. Contact support.");
+          throw new Error("Your account has been suspended. Contact support.");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
 
         if (!isValid) {
           throw new Error("Invalid credentials");
         }
 
+        // Return user object to be saved in JWT
         return {
-            id: user.id,
-            email: user.email,
-            name: `${user.firstName} ${user.lastName}`,
-            firstName: user.firstName, 
-            lastName: user.lastName,
-            city: user.city,          
-            createdAt: user.createdAt,
-            // @ts-ignore
-            role: user.role, 
+          id: user.id,
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          city: user.city,
+          createdAt: user.createdAt,
+          // @ts-ignore
+          role: user.role,
         };
-      }
-    })
+      },
+    }),
   ],
 
   session: { strategy: "jwt" },
 
   callbacks: {
-    // ✅ CHECK BLOCK STATUS (Social Login)
+    // 2. Social Guard: Prevent blocked users from signing in via Google/FB/etc.
     async signIn({ user }) {
-        if (!user.email) return false;
-        
-        // Fetch fresh user data from DB to check status
-        const dbUser = await prisma.user.findUnique({
-            where: { email: user.email }
-        });
+      if (!user.email) return false;
 
-        if (dbUser && dbUser.isBlocked) {
-            return false; // Blocks the sign in
-        }
-        return true;
+      // Always fetch fresh status from DB, as the social provider doesn't know about our 'isBlocked' flag
+      const dbUser = await prisma.user.findUnique({
+        where: { email: user.email },
+      });
+
+      if (dbUser && dbUser.isBlocked) {
+        return false; // Rejects the sign-in attempt
+      }
+      return true;
     },
 
+    // 3. Token Hydration: Add custom fields (role, city) to the JWT
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -110,6 +119,8 @@ export const authOptions: AuthOptions = {
       }
       return token;
     },
+
+    // 4. Session Hydration: Expose token data to the client-side `useSession()` hook
     async session({ session, token }) {
       if (session.user) {
         // @ts-ignore
@@ -128,13 +139,13 @@ export const authOptions: AuthOptions = {
       return session;
     },
   },
-  
+
   pages: {
-    signIn: '/auth', 
-    error: '/auth', // Redirect back to auth on error
+    signIn: "/auth",
+    error: "/auth", // Redirects here if signIn returns false (blocked user)
   },
-  
-  debug: process.env.NODE_ENV === 'development',
+
+  debug: process.env.NODE_ENV === "development",
 };
 
 const handler = NextAuth(authOptions);

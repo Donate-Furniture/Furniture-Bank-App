@@ -1,4 +1,6 @@
-// File: app/listings/[id]/edit/page.tsx
+// Edit Listing Page: Allows users to modify their existing donations.
+// Pre-fills form data, enforces ownership security, and handles updates via the API.
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,17 +11,17 @@ import { Listing } from "@/lib/types";
 const MAIN_CATEGORIES = ["Furniture", "Vehicles", "Books", "Antique"];
 const CURRENT_YEAR = new Date().getFullYear();
 
+// Calculate minimum date (today + 7 days) for the date picker
 const getMinDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 7);
   return d.toISOString().split("T")[0];
 };
 
-// Helper function to format DateTime string to YYYY-MM-DD for date input
+// Helper: Format DateTime string to YYYY-MM-DD for <input type="date">
 const toDateInputString = (dateString: string | undefined): string => {
   if (!dateString) return "";
   try {
-    // Ensure date is treated as UTC to prevent local timezone shifting the day
     return new Date(dateString).toISOString().split("T")[0];
   } catch {
     return "";
@@ -34,23 +36,24 @@ export default function EditListingPage() {
 
   const user = session?.user;
 
-  // Form State - Only track editable fields + context data
+  // --- Form State ---
+  // Only tracks fields that are allowed to be edited
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     city: "",
     zipCode: "",
     status: "available",
-    collectionDeadline: "", // Initialized with empty string
+    collectionDeadline: "",
   });
 
-  // Keep read-only data separate
+  // --- Read-Only Context ---
+  // Stores immutable data (like original price/category) to display context to the user
   const [readOnlyData, setReadOnlyData] = useState<{
     category: string;
     subCategory: string | null;
     estimatedValue: number | null;
     originalPrice: number;
-    // Add deadline here for initial formatting
     collectionDeadline: string;
   } | null>(null);
 
@@ -58,7 +61,7 @@ export default function EditListingPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Fetch the existing listing data
+  // 1. Initial Load: Fetch Listing & Verify Ownership
   useEffect(() => {
     if (!listingId) return;
 
@@ -71,13 +74,14 @@ export default function EditListingPage() {
 
         const listing: Listing = data.listing;
 
-        // Security Check
+        // Security Guard: specific check to ensure only the owner can edit
+        // (The API also enforces this, but client-side redirect improves UX)
         if (user && (user as any).id !== listing.user.id) {
           router.push("/");
           return;
         }
 
-        // Set Editable Fields
+        // Hydrate Form State
         setFormData({
           title: listing.title,
           description: listing.description,
@@ -87,7 +91,7 @@ export default function EditListingPage() {
           collectionDeadline: toDateInputString(listing.collectionDeadline),
         });
 
-        // Set Read-Only Context
+        // Hydrate Read-Only Data
         setReadOnlyData({
           category: listing.category,
           subCategory: listing.subCategory,
@@ -109,6 +113,8 @@ export default function EditListingPage() {
     }
   }, [listingId, status, user, router]);
 
+  // --- Handlers ---
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -117,11 +123,11 @@ export default function EditListingPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  //Handler for Status Buttons
   const handleStatusChange = (newStatus: string) => {
     setFormData({ ...formData, status: newStatus });
   };
 
+  // Submit Update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -139,13 +145,13 @@ export default function EditListingPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        // Display backend validation error if the date is too soon
         if (data.error) {
           setError(data.error);
         } else {
           throw new Error("Failed to update listing");
         }
       } else {
+        // Success: Redirect back to the listing detail page
         router.push(`/listings/${listingId}`);
       }
     } catch (err: any) {
@@ -177,7 +183,7 @@ export default function EditListingPage() {
         </div>
       )}
 
-      {/* --- READ ONLY CONTEXT --- */}
+      {/* --- Context Block (Read-Only) --- */}
       <div className="bg-blue-50 p-4 rounded-md mb-6 flex justify-between items-center text-sm text-blue-800">
         <div>
           <span className="font-semibold">Category:</span>{" "}
@@ -195,8 +201,7 @@ export default function EditListingPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/*Status (Top priority for editing) */}
-        {/*STATUS BUTTONS (Radio Style) */}
+        {/* --- Status Toggle --- */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Status
@@ -221,7 +226,7 @@ export default function EditListingPage() {
             ].map((option) => (
               <button
                 key={option.value}
-                type="button" // Prevent form submission
+                type="button"
                 onClick={() => handleStatusChange(option.value)}
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors border ${
                   formData.status === option.value
@@ -229,8 +234,8 @@ export default function EditListingPage() {
                         option.color
                       } text-white border-transparent ring-2 ring-offset-1 ring-${
                         option.color.split("-")[1]
-                      }-500` // Active State
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50" // Inactive State
+                      }-500`
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 {option.label}
@@ -239,7 +244,7 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        {/* Title */}
+        {/* --- Text Inputs --- */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Title
@@ -254,7 +259,6 @@ export default function EditListingPage() {
           />
         </div>
 
-        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Description
@@ -269,7 +273,7 @@ export default function EditListingPage() {
           />
         </div>
 
-        {/* Location & Deadline Row */}
+        {/* --- Location & Deadline --- */}
         <div className="flex gap-4">
           <div className="w-1/2">
             <label className="block text-sm font-medium text-gray-700">
@@ -285,7 +289,6 @@ export default function EditListingPage() {
             />
           </div>
           <div className="w-1/2">
-            {/* EDITABLE DEADLINE FIELD */}
             <label className="block text-sm font-medium text-gray-700">
               Latest Collection Date
             </label>
@@ -293,7 +296,7 @@ export default function EditListingPage() {
               name="collectionDeadline"
               type="date"
               required
-              min={getMinDate()} // UI min date enforcement
+              min={getMinDate()} // Client-side check
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               value={formData.collectionDeadline}
               onChange={handleChange}
@@ -304,6 +307,7 @@ export default function EditListingPage() {
           </div>
         </div>
 
+        {/* --- Actions --- */}
         <div className="flex gap-4 pt-4 border-t border-gray-100">
           <button
             type="button"

@@ -1,4 +1,6 @@
-// File: app/components/ListingCard.tsx
+// Listing Card Component: A reusable UI element for displaying item summaries in grids/lists.
+// Includes logic for relative time formatting ("2 days ago"), dynamic status badges, and fallback image handling.
+
 import React from "react";
 import Link from "next/link";
 import { Listing } from "@/lib/types";
@@ -7,7 +9,8 @@ interface ListingProps {
   listing: Listing;
 }
 
-// Utility function to format the post date
+// --- Helper: Relative Time Formatter ---
+// Converts ISO timestamps into human-readable strings (e.g., "5 minutes ago")
 const timeAgo = (dateString: string): string => {
   const now = new Date();
   const past = new Date(dateString);
@@ -22,7 +25,8 @@ const timeAgo = (dateString: string): string => {
   return `${diffInDays} days ago`;
 };
 
-// Helper for Status Badge Styling
+// --- Helper: Status Badge Styling ---
+// Returns Tailwind classes based on the item's current availability status
 const getStatusStyles = (status: string) => {
   switch (status) {
     case "donated":
@@ -42,24 +46,27 @@ const getStatusLabel = (status: string) => {
 };
 
 const ListingCard: React.FC<ListingProps> = ({ listing }) => {
+  // Safe defaults for display
   const imageUrl = listing.imageUrls[0];
   const formattedDate = timeAgo(listing.createdAt);
+
+  // formatting price: 0 becomes "FREE"
   const displayPrice =
     listing.estimatedValue && listing.estimatedValue > 0
       ? `$${listing.estimatedValue.toFixed(2)}`
       : "FREE";
 
   return (
-    // Wrap the entire card in a Link component using the listing ID
+    // Wrap the entire card in a Link for better UX (entire card is clickable)
     <Link href={`/listings/${listing.id}`} passHref legacyBehavior>
       <div className="bg-card-bg rounded-xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden border border-gray-100 cursor-pointer">
-        {/* Image Container */}
+        {/* --- Image Section --- */}
         <div className="relative h-48 w-full bg-gray-200">
           <img
             src={imageUrl}
             alt={listing.title}
             className="w-full h-full object-cover"
-            // Placeholder fallback in case of bad image URL
+            // Fallback: If image fails to load, show a placeholder
             onError={(e) => {
               (e.target as HTMLImageElement).src =
                 "https://placehold.co/600x400/CCCCCC/333333?text=No+Image";
@@ -75,8 +82,9 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
           </div>
         </div>
 
+        {/* --- Content Section --- */}
         <div className="p-4">
-          {/* Price Tag */}
+          {/* Price & Category */}
           <div className="flex justify-between items-center mb-2">
             <span
               className={`text-sm font-bold px-3 py-1 rounded-full ${
@@ -85,7 +93,6 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
                   : "bg-indigo-100 text-indigo-800"
               }`}
             >
-              {/* Show Estimated Value */}
               {displayPrice}
             </span>
             <span className="text-xs text-gray-500">{listing.category}</span>
@@ -96,7 +103,7 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
             {listing.title}
           </h3>
 
-          {/* Location & Post Date */}
+          {/* Location With Icon */}
           <p className="text-sm text-gray-600 mb-3 flex items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -113,7 +120,7 @@ const ListingCard: React.FC<ListingProps> = ({ listing }) => {
             {listing.city}
           </p>
 
-          {/* Seller Info */}
+          {/* Footer: Seller & Time */}
           <div className="border-t border-gray-100 pt-3 mt-3 text-xs text-gray-500">
             Posted by {listing.user.firstName} {listing.user.lastName.charAt(0)}
             .<span className="float-right">{formattedDate}</span>

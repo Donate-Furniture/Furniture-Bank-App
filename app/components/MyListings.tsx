@@ -1,3 +1,6 @@
+// My Listings Component: A dashboard widget that fetches and displays the authenticated user's active inventory.
+// Handles loading states, empty states, and renders the grid using the shared ListingCard component.
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,19 +9,23 @@ import { Listing } from "@/lib/types";
 import ListingCard from "./ListingCard";
 
 export default function MyListings() {
-  const { status } = useSession(); // We just check status, cookies handle the rest
+  // Access session status to conditionally trigger data fetching
+  const { status } = useSession();
+
+  // --- Local State ---
   const [listings, setListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Only fetch if authenticated
+    // 1. Guard: Only attempt fetch if user is confirmed authenticated
     if (status !== "authenticated") return;
 
     const fetchMyListings = async () => {
       try {
-        // No headers needed! Cookies are sent automatically.
-        const res = await fetch("/api/listings/mine", {
+        // 2. Fetch Data: Cookies are sent automatically by the browser
+        // Points to app/api/listings/user/route.ts
+        const res = await fetch("/api/listings/user", {
           method: "GET",
         });
 
@@ -45,9 +52,11 @@ export default function MyListings() {
         My Posted Items ({listings.length})
       </h2>
 
+      {/* --- State: Loading & Error --- */}
       {isLoading && <p className="text-center py-8">Loading your items...</p>}
       {error && <p className="text-center py-8 text-red-600">Error: {error}</p>}
 
+      {/* --- State: Empty --- */}
       {!isLoading && listings.length === 0 && !error && (
         <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
           <p className="text-lg text-gray-500">
@@ -56,10 +65,10 @@ export default function MyListings() {
         </div>
       )}
 
-      {/* Display Listings in a Grid */}
+      {/* --- State: List Display --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {listings.map((listing) => (
-          // We reuse the existing ListingCard component
+          // Reuse the global ListingCard for consistent UI
           <ListingCard key={listing.id} listing={listing} />
         ))}
       </div>

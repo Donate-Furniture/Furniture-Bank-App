@@ -1,3 +1,6 @@
+// All Listings Page: The main public catalog view.
+// Features a responsive sidebar for filtering (Search, Category, Price, etc.), debounced API fetching, and pagination.
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,6 +15,8 @@ export default function AllListingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // --- Filter State ---
+  // Initialize from URL params to allow sharing links with pre-applied filters
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
     category: searchParams.get("category") || "All",
@@ -22,18 +27,20 @@ export default function AllListingsPage() {
     sort: "date_desc",
   });
 
-  // Pagination State
+  // --- Pagination State ---
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // --- Data State ---
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch listings whenever filters OR page changes
+  // --- Data Fetching Logic ---
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
       try {
+        // Construct query string dynamically based on active filters
         const query = new URLSearchParams();
         if (filters.search) query.set("search", filters.search);
         if (filters.category !== "All") query.set("category", filters.category);
@@ -48,11 +55,12 @@ export default function AllListingsPage() {
         query.set("page", page.toString());
         query.set("limit", "12");
 
+        // API Call
         const res = await fetch(`/api/listings?${query.toString()}`);
         const data = await res.json();
 
         setListings(data.listings || []);
-        //Set Total Pages from API response
+        // Sync pagination state with backend response
         setTotalPages(data.pagination?.totalPages || 1);
       } catch (error) {
         console.error("Error fetching listings:", error);
@@ -61,19 +69,21 @@ export default function AllListingsPage() {
       }
     };
 
-    // Debounce
+    // Debounce: Wait 300ms after user stops typing before fetching
+    // Prevents excessive API calls during text input
     const timeoutId = setTimeout(() => {
       fetchListings();
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [filters, page]); // Re-run when page changes
+  }, [filters, page]); // Re-run whenever filters or page changes
 
+  // --- Handlers ---
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
-    setPage(1); // Reset to page 1 when filters change
+    setPage(1); // Reset to first page whenever filter criteria changes
   };
 
   return (
@@ -83,7 +93,6 @@ export default function AllListingsPage() {
       <div className="flex flex-col lg:flex-row gap-8">
         {/* --- LEFT SIDEBAR: FILTERS --- */}
         <aside className="w-full lg:w-1/4 space-y-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-          {/* ... (Search, Category, City, Condition inputs remain exactly the same) ... */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Keyword
@@ -97,6 +106,7 @@ export default function AllListingsPage() {
               onChange={handleFilterChange}
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Category
@@ -114,6 +124,7 @@ export default function AllListingsPage() {
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               City
@@ -127,6 +138,7 @@ export default function AllListingsPage() {
               onChange={handleFilterChange}
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Condition
@@ -144,6 +156,7 @@ export default function AllListingsPage() {
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Price Range
@@ -167,6 +180,7 @@ export default function AllListingsPage() {
               />
             </div>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Sort By
@@ -187,12 +201,14 @@ export default function AllListingsPage() {
 
         {/* --- MAIN CONTENT: RESULTS --- */}
         <main className="w-full lg:w-3/4">
+          {/* Loading State */}
           {loading ? (
             <p className="text-center py-10 text-gray-500">
               Updating results...
             </p>
           ) : listings.length > 0 ? (
             <>
+              {/* Grid Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {listings.map((item) => (
                   <ListingCard key={item.id} listing={item} />
@@ -223,6 +239,7 @@ export default function AllListingsPage() {
               )}
             </>
           ) : (
+            /* Empty State */
             <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-300">
               <p className="text-lg text-gray-500">
                 No listings match your filters.

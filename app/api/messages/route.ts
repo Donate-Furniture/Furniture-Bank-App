@@ -1,13 +1,17 @@
-// File: app/api/messages/route.ts
+// Messaging API: Central hub for the internal chat system.
+// Handles sending messages (POST), marking them as read (PUT), and retrieving both conversation history and the inbox summary (GET).
+
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 
+// Force dynamic to ensure real-time chat updates
 export const dynamic = "force-dynamic";
 
-// POST: Send a message
+// --- POST: Send a Message ---
 export async function POST(request: NextRequest) {
+  // 1. Security Guard
   const session = await getServerSession(authOptions);
   if (!session || !session.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,9 +21,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { recipientId, content, listingId } = body;
 
+    // 2. Validation
     if (!recipientId || !content)
       return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
+    // 3. Create Message
     const newMessage = await prisma.message.create({
       data: { senderId, recipientId, content, listingId: listingId || null },
     });
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT: Mark as read
+// --- PUT: Mark Conversation as Read ---
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user)
@@ -47,6 +53,7 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
 
+    // Update all unread messages from this specific sender for the current user
     await prisma.message.updateMany({
       where: {
         senderId: senderId,
@@ -62,8 +69,9 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// GET: Fetch history OR inbox
+// --- GET: Fetch History, Inbox, or Unread Count ---
 export async function GET(request: NextRequest) {
+  // 1. Security Guard
   const session = await getServerSession(authOptions);
   if (!session || !session.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -74,6 +82,7 @@ export async function GET(request: NextRequest) {
   const getUnreadCount = searchParams.get("unreadCount");
 
   try {
+    // MODE A: Get Global Unread Count (for badges)
     if (getUnreadCount) {
       const count = await prisma.message.count({
         where: { recipientId: userId, read: false },
@@ -81,7 +90,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ count }, { status: 200 });
     }
 
-    // CASE 1: Fetch specific conversation history
+    // MODE B: Fetch Specific Conversation History
     if (otherUserId) {
       const messages = await prisma.message.findMany({
         where: {
@@ -90,7 +99,7 @@ export async function GET(request: NextRequest) {
             { senderId: otherUserId, recipientId: userId },
           ],
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "asc" }, // Oldest first for chat bubbles
         include: {
           sender: { select: { firstName: true, lastName: true } },
           recipient: { select: { firstName: true, lastName: true } },
@@ -100,7 +109,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ messages }, { status: 200 });
     }
 
-    // CASE 2: Fetch Inbox (List of conversations)
+    // MODE C: Fetch Inbox (List of distinct conversations)
+    // 1. Get ALL messages involving user, sorted by newest first
     const messages = await prisma.message.findMany({
       where: {
         OR: [{ senderId: userId }, { recipientId: userId }],
@@ -109,7 +119,6 @@ export async function GET(request: NextRequest) {
       include: {
         sender: { select: { id: true, firstName: true, lastName: true } },
         recipient: { select: { id: true, firstName: true, lastName: true } },
-        // Include ID and ImageUrls here
         listing: {
           select: {
             id: true,
@@ -120,13 +129,15 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // 2. Group by "Other User" to create distinct conversation threads
     const conversationsMap = new Map();
 
     messages.forEach((msg) => {
       const otherUser = msg.senderId === userId ? msg.recipient : msg.sender;
 
+      // Since messages are sorted desc, the first time we see a user, it's the latest message
       if (!conversationsMap.has(otherUser.id)) {
-        // Determine if this is unread
+        // Determine if this specific thread is unread
         const isUnread = msg.recipientId === userId && !msg.read;
 
         conversationsMap.set(otherUser.id, {

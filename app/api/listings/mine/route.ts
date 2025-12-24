@@ -1,11 +1,14 @@
-// All listings of logged in user
+// User Listings API: Retrieves the portfolio of listings owned by the currently authenticated user.
+// Used for the "My Listings" dashboard to let users manage their own inventory.
+
 import { NextResponse, NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import prisma from "@/lib/prisma";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
 export async function GET(request: NextRequest) {
-  // 1. Check Session (Server-Side Protection)
+  // 1. Security Guard: Verify Session
+  // Unlike public routes, this one strictly requires an active login.
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user) {
@@ -15,12 +18,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Safely extract User ID from the session
-  // Note: We ensured 'id' exists in the session callback in [...nextauth]/route.ts
+  // Safely extract User ID from the session (populated by the jwt callback)
   const userId = (session.user as any).id;
 
   try {
-    // 2. Fetch listings filtered by the session user's ID
+    // 2. Fetch User's Listings: Filter by session ID and sort by newest
     const userListings = await prisma.listing.findMany({
       where: {
         userId: userId,
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
           select: {
             firstName: true,
             lastName: true,
-            city: true, // New field
+            city: true,
             email: true,
           },
         },

@@ -1,60 +1,73 @@
-// File: app/auth/reset-password/page.tsx
-'use client';
+// Reset Password Page: The landing page for the email recovery link.
+// Captures the token from the URL, validates the new password inputs, and communicates with the API to finalize the reset.
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function ResetPasswordPage() {
+  // --- URL State ---
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
   const router = useRouter();
 
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [message, setMessage] = useState('');
+  // --- Form State ---
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [message, setMessage] = useState("");
 
+  // 1. Initial Check: Validate token presence immediately
   useEffect(() => {
-      if (!token) {
-          setStatus('error');
-          setMessage('Missing reset token.');
-      }
+    if (!token) {
+      setStatus("error");
+      setMessage("Missing reset token.");
+    }
   }, [token]);
 
+  // --- Form Submission ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 2. Validation: Ensure passwords match before hitting the server
     if (password !== confirmPassword) {
-        setMessage("Passwords do not match");
-        setStatus('error');
-        return;
+      setMessage("Passwords do not match");
+      setStatus("error");
+      return;
     }
 
-    setStatus('loading');
-    
+    setStatus("loading");
+
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      // 3. API Call: Send token + new password
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to reset password');
+        throw new Error(data.error || "Failed to reset password");
       }
 
-      setStatus('success');
-      setTimeout(() => router.push('/auth'), 3000); // Redirect after 3s
-
+      // 4. Success Flow: Notify user and redirect
+      setStatus("success");
+      setTimeout(() => router.push("/auth"), 3000); // Redirect after 3s
     } catch (error: any) {
-      setStatus('error');
+      setStatus("error");
       setMessage(error.message);
     }
   };
 
-  if (!token) return <p className="p-10 text-center text-red-500">Invalid Link</p>;
+  // Guard: If accessed without a token, show error immediately
+  if (!token)
+    return <p className="p-10 text-center text-red-500">Invalid Link</p>;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -65,50 +78,58 @@ export default function ResetPasswordPage() {
           </h2>
         </div>
 
-        {status === 'success' ? (
-             <div className="rounded-md bg-green-50 p-4 text-center">
-                <h3 className="text-lg font-medium text-green-800">Success!</h3>
-                <p className="text-green-700 mt-2">Your password has been reset. Redirecting to login...</p>
-             </div>
+        {/* --- View: Success State --- */}
+        {status === "success" ? (
+          <div className="rounded-md bg-green-50 p-4 text-center">
+            <h3 className="text-lg font-medium text-green-800">Success!</h3>
+            <p className="text-green-700 mt-2">
+              Your password has been reset. Redirecting to login...
+            </p>
+          </div>
         ) : (
-            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                {status === 'error' && (
-                    <div className="bg-red-50 text-red-500 p-3 rounded text-sm text-center">
-                        {message}
-                    </div>
-                )}
-                
-                <div className="rounded-md shadow-sm space-y-4">
-                    <div>
-                    <label className="block text-sm font-medium text-gray-700">New Password</label>
-                    <input
-                        type="password"
-                        required
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                    />
-                    </div>
-                    <div>
-                    <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
-                    <input
-                        type="password"
-                        required
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                    </div>
-                </div>
+          /* --- View: Input Form --- */
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            {status === "error" && (
+              <div className="bg-red-50 text-red-500 p-3 rounded text-sm text-center">
+                {message}
+              </div>
+            )}
 
-                <button
-                    type="submit"
-                    disabled={status === 'loading'}
-                    className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400"
-                >
-                    {status === 'loading' ? 'Resetting...' : 'Reset Password'}
-                </button>
-            </form>
+            <div className="rounded-md shadow-sm space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400"
+            >
+              {status === "loading" ? "Resetting..." : "Reset Password"}
+            </button>
+          </form>
         )}
       </div>
     </div>

@@ -1,4 +1,6 @@
-// File: app/messages/page.tsx
+// Inbox Page: The central messaging hub where users can view all their active conversations.
+// Displays a list of threads with unread indicators, last message previews, and deep links back to the relevant listings.
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -27,8 +29,10 @@ export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- Data Fetching ---
   const fetchConversations = async () => {
     try {
+      // Add timestamp to prevent browser caching of the inbox state
       const res = await fetch(`/api/messages?ts=${Date.now()}`);
       const data = await res.json();
 
@@ -42,17 +46,18 @@ export default function InboxPage() {
     }
   };
 
-  // ✅ NEW: Function to mark as read immediately
+  // --- Handler: Mark Read ---
+  // Triggered immediately upon clicking a conversation to ensure UI responsiveness
   const handleMarkAsRead = async (senderId: string) => {
     try {
-      // Optimistically update UI (remove blue background immediately)
+      // 1. Optimistic UI Update: Remove the "unread" style instantly
       setConversations((prev) =>
         prev.map((c) =>
           c.user.id === senderId ? { ...c, isUnread: false } : c
         )
       );
 
-      // Send request to backend
+      // 2. Background API Call: Persist the read status
       await fetch("/api/messages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -63,6 +68,7 @@ export default function InboxPage() {
     }
   };
 
+  // --- Auth Guard ---
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth");
@@ -78,6 +84,7 @@ export default function InboxPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 lg:p-8 min-h-screen">
+      {/* Header & Actions */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">My Messages</h1>
         <button
@@ -92,8 +99,10 @@ export default function InboxPage() {
         Select a conversation to continue chatting on the listing page.
       </p>
 
+      {/* Conversation List */}
       <div className="space-y-4">
         {conversations.length === 0 ? (
+          /* Empty State */
           <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
             <p className="text-lg text-gray-500">No messages yet.</p>
             <Link
@@ -104,6 +113,7 @@ export default function InboxPage() {
             </Link>
           </div>
         ) : (
+          /* List Items */
           conversations.map((conv) => (
             <Link
               key={conv.user.id + conv.date}
@@ -116,7 +126,7 @@ export default function InboxPage() {
                     )}`
                   : "#"
               }
-              // ✅ TRIGGER: Mark read when clicked
+              // Intercept click to mark as read before navigating
               onClick={(e) => {
                 if (!conv.listingId) {
                   e.preventDefault();
@@ -125,7 +135,6 @@ export default function InboxPage() {
                   );
                   return;
                 }
-                // Fire and forget (don't await) so navigation is fast
                 handleMarkAsRead(conv.user.id);
               }}
               className={`block border rounded-xl p-4 transition-all group relative
@@ -136,11 +145,13 @@ export default function InboxPage() {
                                 }
                             `}
             >
+              {/* Unread Dot Indicator */}
               {conv.isUnread && (
                 <span className="absolute top-4 right-4 h-3 w-3 rounded-full bg-blue-600 ring-2 ring-white"></span>
               )}
 
               <div className="flex items-start gap-4">
+                {/* Avatar / Listing Thumbnail */}
                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                   {conv.listingImage ? (
                     <img

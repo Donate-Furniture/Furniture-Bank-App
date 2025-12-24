@@ -1,4 +1,6 @@
-// File: app/components/FloatingInbox.tsx
+// Floating Inbox Component: A persistent floating action button (FAB) that monitors unread message counts via polling.
+// Provides quick access to the messaging center and visual notification cues (red dot) for authenticated users.
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -9,17 +11,20 @@ export default function FloatingInbox() {
   const { status } = useSession();
   const [hasUnread, setHasUnread] = useState(false);
 
+  // --- Polling Logic ---
   useEffect(() => {
+    // Optimization: Don't poll if user isn't logged in
     if (status !== "authenticated") return;
 
     const checkUnread = async () => {
       try {
+        // Fetch count with timestamp to bust cache
         const res = await fetch(
           `/api/messages?unreadCount=true&ts=${Date.now()}`
         );
         const data = await res.json();
         if (res.ok) {
-          // Just check if count is greater than 0
+          // Show dot if count > 0
           setHasUnread(data.count > 0);
         }
       } catch (e) {
@@ -27,11 +32,13 @@ export default function FloatingInbox() {
       }
     };
 
+    // Initial check + interval setup
     checkUnread();
-    const interval = setInterval(checkUnread, 5000);
+    const interval = setInterval(checkUnread, 5000); // Poll every 5s
     return () => clearInterval(interval);
   }, [status]);
 
+  // Hidden for unauthenticated guests
   if (status !== "authenticated") return null;
 
   return (
@@ -40,9 +47,9 @@ export default function FloatingInbox() {
       className="fixed bottom-6 right-6 z-50 p-4 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 transition-all hover:scale-110 flex items-center justify-center border-2 border-white group"
       aria-label="Messages"
     >
-      {/* Simple Red Dot Notification */}
+      {/* Notification Badge (Red Dot) */}
       {hasUnread && (
-        <span className="absolute top-0 right-0 block h-4 w-4 rounded-full ring-2 ring-white bg-red-500 " />
+        <span className="absolute top-0 right-0 block h-4 w-4 rounded-full ring-2 ring-white bg-red-500 animate-pulse" />
       )}
 
       {/* Chat Icon */}

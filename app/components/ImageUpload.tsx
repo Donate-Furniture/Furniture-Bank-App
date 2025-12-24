@@ -1,4 +1,6 @@
-// File: app/components/ImageUpload.tsx
+// Image Upload Component: Handles client-side file selection and direct-to-cloud upload via Vercel Blob.
+// Provides visual feedback (loading spinners, previews) and enforces basic size validation before upload.
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -18,11 +20,12 @@ export default function ImageUpload({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- File Selection Handler ---
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Basic size validation (e.g., max 4MB)
+    // 1. Client-side Validation: Max 4MB
     if (file.size > 4 * 1024 * 1024) {
       alert("File size too large. Max 4MB.");
       return;
@@ -31,20 +34,21 @@ export default function ImageUpload({
     setIsUploading(true);
 
     try {
-      // Vercel Blob Client Upload
+      // 2. Vercel Blob Upload
+      // 'handleUploadUrl' points to our secure server-side route that authorizes the token
       const newBlob = await upload(file.name, file, {
         access: "public",
-        handleUploadUrl: "/api/upload", // Points to the route we created in Step 3
+        handleUploadUrl: "/api/upload",
       });
 
-      // Success! Pass the URL back to the parent
+      // 3. Callback: Pass the new public URL to the parent form
       onUpload(newBlob.url);
     } catch (error) {
       console.error("Upload failed", error);
       alert("Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
-      // Reset input
+      // Reset input to allow selecting the same file again if needed
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -53,7 +57,7 @@ export default function ImageUpload({
 
   return (
     <div className="space-y-4">
-      {/* Image Previews Grid */}
+      {/* --- Image Previews Grid --- */}
       {value.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {value.map((url) => (
@@ -66,6 +70,7 @@ export default function ImageUpload({
                 alt="Listing"
                 className="w-full h-full object-cover"
               />
+              {/* Remove Button (Visible on Hover) */}
               <button
                 type="button"
                 onClick={() => onRemove(url)}
@@ -91,7 +96,7 @@ export default function ImageUpload({
         </div>
       )}
 
-      {/* Upload Button */}
+      {/* --- Upload Button UI --- */}
       <div className="flex items-center">
         <label
           className={`cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 ${
@@ -100,6 +105,7 @@ export default function ImageUpload({
         >
           {isUploading ? (
             <>
+              {/* Spinner */}
               <svg
                 className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700"
                 xmlns="http://www.w3.org/2000/svg"
@@ -124,6 +130,7 @@ export default function ImageUpload({
             </>
           ) : (
             <>
+              {/* Icon */}
               <svg
                 className="-ml-1 mr-2 h-5 w-5 text-gray-400"
                 xmlns="http://www.w3.org/2000/svg"

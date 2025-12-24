@@ -1,4 +1,6 @@
-// File: app/components/ChatWindow.tsx
+// Chat Window Component: Real-time messaging interface with auto-scrolling, polling for updates, and read-receipt logic.
+// optimized to minimize re-renders and handle message history between two users.
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -30,7 +32,7 @@ export default function ChatWindow({
 
   const currentUserId = (session?.user as any)?.id;
 
-  // Function to mark messages as read
+  // --- API: Mark Conversation as Read ---
   const markAsRead = async () => {
     try {
       await fetch("/api/messages", {
@@ -43,14 +45,17 @@ export default function ChatWindow({
     }
   };
 
+  // --- API: Fetch & Sync Messages ---
   const fetchMessages = async () => {
     try {
+      // Add timestamp to prevent caching
       const res = await fetch(
         `/api/messages?userId=${recipientId}&ts=${Date.now()}`
       );
       const data = await res.json();
+
       if (res.ok) {
-        // Optimization: Only update state if data actually changed
+        // Optimization: Only update state if the data actually changed (prevents flickering)
         setMessages((prev) => {
           if (JSON.stringify(prev) === JSON.stringify(data.messages)) {
             return prev;
@@ -58,7 +63,7 @@ export default function ChatWindow({
           return data.messages;
         });
 
-        // ✅ NEW: Mark read every time we fetch successfully
+        // Trigger read status update if fetch was successful
         markAsRead();
       }
     } catch (error) {
@@ -68,22 +73,25 @@ export default function ChatWindow({
     }
   };
 
-  // Initial Load & Polling
+  // --- Lifecycle: Polling ---
   useEffect(() => {
     fetchMessages();
+    // Poll every 5 seconds for new messages (Simulating real-time sockets)
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
   }, [recipientId]);
 
-  // Scroll Logic
+  // --- UI Behavior: Auto-Scroll ---
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // --- Handler: Send Message ---
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
+    // Optimistic UI: Clear input immediately
     const tempContent = newMessage;
     setNewMessage("");
 
@@ -99,10 +107,10 @@ export default function ChatWindow({
       });
 
       if (res.ok) {
-        fetchMessages();
+        fetchMessages(); // Refresh immediately to show sent message
       } else {
         alert("Failed to send");
-        setNewMessage(tempContent);
+        setNewMessage(tempContent); // Revert on failure
       }
     } catch (error) {
       console.error(error);
@@ -111,12 +119,14 @@ export default function ChatWindow({
 
   return (
     <div className="flex flex-col h-[500px] border border-gray-200 rounded-xl bg-white shadow-md">
+      {/* Header */}
       <div className="p-4 border-b border-gray-100 bg-gray-50 rounded-t-xl">
         <h3 className="font-semibold text-gray-800">
           Chat with {recipientName}
         </h3>
       </div>
 
+      {/* Message List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading ? (
           <p className="text-center text-gray-400 text-sm">
@@ -147,9 +157,11 @@ export default function ChatWindow({
             );
           })
         )}
+        {/* Invisible element to scroll to */}
         <div ref={bottomRef} />
       </div>
 
+      {/* Input Area */}
       <form
         onSubmit={handleSend}
         className="p-4 border-t border-gray-100 flex gap-2"

@@ -1,4 +1,6 @@
-// File: app/api/auth/register/route.ts
+// Registration API: Handles new user sign-ups via email/password or social providers.
+// Enforces duplicate email checks, strict password requirements, and hashes credentials before storage.
+
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -7,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Destructure all the fields from the form
+    // Destructure all incoming form data
     const {
       email,
       password,
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Strict Password Check: If not a social login, password is required
+    // Guard: Password is mandatory unless a social provider (Google/FB) is handling auth
     if (!provider && !password) {
       return NextResponse.json(
         { error: "Password is required for email registration." },
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if user already exists
+    // Guard: Prevent duplicate accounts
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json(
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
       hashedPassword = await hashPassword(password);
     }
 
-    // --- 3. CREATE USER IN DATABASE ---
+    // --- 3. DATABASE CREATION ---
 
     const newUser = await prisma.user.create({
       data: {
@@ -63,24 +65,21 @@ export async function POST(request: Request) {
         password: hashedPassword,
         firstName,
         lastName,
-        // Save Address & Contact Info
+        // Optional: Address & Contact Info
         phoneNumber: phoneNumber || null,
         streetAddress: streetAddress || null,
         city: city || null,
         province: province || null,
         postalCode: postalCode || null,
 
-        // Save Provider Metadata
+        // Metadata: Track if they joined via Credentials or Social
         provider: provider || "credentials",
         providerId: providerId || null,
       },
     });
 
-    // --- 4. RESPONSE ---
-
-    // The frontend will receive this 201 OK, and then immediately call
-    // signIn('credentials') from NextAuth to create the session.
-
+    // --- 4. SUCCESS RESPONSE ---
+    // Note: The frontend will immediately use these credentials to call signIn() automatically.
     return NextResponse.json(
       {
         message: "User registered successfully",

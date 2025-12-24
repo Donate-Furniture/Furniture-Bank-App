@@ -1,4 +1,6 @@
-// File: app/profile/page.tsx
+// Profile Dashboard: Displays the authenticated user's personal information and their active listings.
+// Acts as a central hub for account management, linking to edit forms and the inventory manager.
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -6,9 +8,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MyListings from "@/app/components/MyListings";
 import { User } from "@/lib/types";
-import Link from 'next/link';
+import Link from "next/link";
 
-// Helper function to safely format dates
+// Helper: Safe date formatting for display
 const formatDate = (dateString: string | undefined) => {
   if (!dateString) return "Unknown";
   try {
@@ -23,14 +25,15 @@ const formatDate = (dateString: string | undefined) => {
 };
 
 export default function ProfilePage() {
-  //Use useSession hook
+  // --- Auth & Routing ---
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // State to hold the full profile data fetched from DB
+  // --- Local State ---
   const [fullProfile, setFullProfile] = useState<User | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
+  // --- Data Fetching ---
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth");
@@ -38,7 +41,7 @@ export default function ProfilePage() {
     }
 
     if (status === "authenticated") {
-      // Fetch the heavy data from the API
+      // Fetch detailed profile data not available in the lightweight session
       const fetchProfile = async () => {
         try {
           const res = await fetch("/api/user/me");
@@ -60,6 +63,7 @@ export default function ProfilePage() {
     return <p className="text-center p-10">Loading profile data...</p>;
   }
 
+  // Format address for cleaner display
   const formattedAddress = [
     fullProfile?.streetAddress,
     fullProfile?.city,
@@ -75,17 +79,21 @@ export default function ProfilePage() {
         My Profile Dashboard
       </h1>
 
+      {/* --- User Details Section --- */}
       <div className="bg-white p-6 shadow-xl rounded-xl border border-indigo-100 mb-10">
-         <div className="flex justify-between items-start mb-4">
-                    <h2 className="text-2xl font-semibold text-indigo-600">Account Information</h2>
-                    {/* Edit Button */}
-                    <Link 
-                        href="/profile/edit" 
-                        className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
-                    >
-                        Edit Profile
-                    </Link>
-                </div>
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="text-2xl font-semibold text-indigo-600">
+            Account Information
+          </h2>
+          {/* Edit Profile CTA */}
+          <Link
+            href="/profile/edit"
+            className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
+          >
+            Edit Profile
+          </Link>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
           <p>
             <span className="font-medium">Name:</span> {fullProfile?.firstName}{" "}
@@ -109,6 +117,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* --- Inventory Section --- */}
       <div className="mt-10">
         <MyListings />
       </div>

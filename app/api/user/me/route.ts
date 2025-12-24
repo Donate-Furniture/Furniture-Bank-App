@@ -1,4 +1,6 @@
-// File: app/api/user/me/route.ts
+// User Profile API: Manages the authenticated user's personal details.
+// Allows fetching full profile data (GET) and updating contact info or passwords (PUT).
+
 import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route'; 
@@ -6,8 +8,10 @@ import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth'; // Ensure this is exported from lib/auth
 import * as bcrypt from 'bcryptjs';
 
+// Force dynamic to ensure profile data is never stale
 export const dynamic = 'force-dynamic';
 
+// --- GET: Fetch My Profile ---
 export async function GET() {
   const session = await getServerSession(authOptions);
 
@@ -16,6 +20,7 @@ export async function GET() {
   }
 
   try {
+    // Fetch full details for the "My Profile" page
     const fullUserProfile = await prisma.user.findUnique({
       where: {
         // @ts-ignore
@@ -32,7 +37,7 @@ export async function GET() {
         province: true,
         postalCode: true,
         createdAt: true,
-        // We do NOT select password
+        // Security: Never select the password hash
       }
     });
 
@@ -48,7 +53,7 @@ export async function GET() {
   }
 }
 
-// PUT Handler for updating profile & password
+// --- PUT: Update Profile & Password ---
 export async function PUT(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
@@ -74,14 +79,16 @@ export async function PUT(request: NextRequest) {
         };
 
         // 2. Handle Password Change (Optional)
+        // Only executes if the user is attempting to set a new password
         if (newPassword) {
             if (!currentPassword) {
                 return NextResponse.json({ error: 'Current password is required to set a new one.' }, { status: 400 });
             }
 
-            // Fetch current user to get the password hash
+            // Fetch current user to get the password hash for verification
             const user = await prisma.user.findUnique({ where: { id: userId } });
 
+            // Guard: Social login users don't have passwords to change
             if (!user || !user.password) {
                  return NextResponse.json({ error: 'Social login users cannot change passwords here.' }, { status: 403 });
             }
@@ -92,7 +99,7 @@ export async function PUT(request: NextRequest) {
                 return NextResponse.json({ error: 'Incorrect current password.' }, { status: 400 });
             }
 
-            // Hash new password
+            // Secure Hash: Encrypt new password before storage
             updateData.password = await hashPassword(newPassword);
         }
 
