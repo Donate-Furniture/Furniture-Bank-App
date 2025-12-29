@@ -86,6 +86,44 @@ export async function GET(
   }
 }
 
+// PUT Method to Edit User Info
+export async function PUT(
+    request: NextRequest,
+    { params }: { params: { id: string } }
+) {
+    const session = await getServerSession(authOptions);
+    // @ts-ignore
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    try {
+        const body = await request.json();
+        const { firstName, lastName, email, phoneNumber, streetAddress, city, province, postalCode } = body;
+
+        // Validations can be added here (e.g. check if email is taken by another user)
+
+        const updatedUser = await prisma.user.update({
+            where: { id: params.id },
+            data: {
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                streetAddress,
+                city,
+                province,
+                postalCode
+            }
+        });
+
+        return NextResponse.json({ success: true, user: updatedUser }, { status: 200 });
+    } catch (error) {
+        console.error("Admin User Update Error:", error);
+        return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+    }
+}
+
 // --- DELETE: Remove User Account ---
 export async function DELETE(
   request: NextRequest,

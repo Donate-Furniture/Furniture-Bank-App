@@ -64,3 +64,33 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  // @ts-ignore
+  if (!session || !session.user || session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    // 1. Get the ID from the JSON body (Matches your frontend code)
+    const body = await request.json();
+    const { id } = body;
+
+    if (!id) {
+        return NextResponse.json({ error: "Report ID is required" }, { status: 400 });
+    }
+
+    // 2. Delete the report
+    await prisma.report.delete({
+      where: { id: id },
+    });
+
+    return NextResponse.json({ message: "Report resolved and removed." });
+  } catch (error) {
+    console.error("Delete Report Error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+

@@ -38,7 +38,8 @@ export default function ChatWindow({
       await fetch("/api/messages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senderId: recipientId }),
+        // ✅ FIX: Send listingId so we only mark THIS item's messages as read
+        body: JSON.stringify({ senderId: recipientId, listingId }),
       });
     } catch (e) {
       console.error("Failed to mark read", e);
@@ -48,10 +49,14 @@ export default function ChatWindow({
   // --- API: Fetch & Sync Messages ---
   const fetchMessages = async () => {
     try {
-      // Add timestamp to prevent caching
-      const res = await fetch(
-        `/api/messages?userId=${recipientId}&ts=${Date.now()}`
-      );
+      // ✅ FIX: Add listingId to the URL parameters
+      const queryParams = new URLSearchParams({
+        userId: recipientId,
+        listingId: listingId || "null", // Send 'null' string if undefined to explicitly ask for general chat
+        ts: Date.now().toString(),
+      });
+
+      const res = await fetch(`/api/messages?${queryParams.toString()}`);
       const data = await res.json();
 
       if (res.ok) {
@@ -79,7 +84,7 @@ export default function ChatWindow({
     // Poll every 5 seconds for new messages (Simulating real-time sockets)
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
-  }, [recipientId]);
+  }, [recipientId, listingId]); // ✅ Re-run if listingId changes
 
   // --- UI Behavior: Auto-Scroll ---
   useEffect(() => {
@@ -102,7 +107,7 @@ export default function ChatWindow({
         body: JSON.stringify({
           recipientId,
           content: tempContent,
-          listingId,
+          listingId, // This was already correct!
         }),
       });
 

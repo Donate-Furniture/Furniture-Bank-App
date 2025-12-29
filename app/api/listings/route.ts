@@ -100,8 +100,13 @@ export async function POST(request: NextRequest) {
     const validValuationDocs = Array.isArray(valuationDocUrl)
       ? valuationDocUrl
       : [];
+    
+    // ✅ FIX: Define isScrapVehicle check EARLY so we can skip high-value logic
+    const isScrapVehicle = category === "Vehicles" && condition === "scrap";
 
-    if (billPrice > 999) {
+    // ✅ FIX: Added !isScrapVehicle to this check.
+    // If it is a scrap car, we allow billPrice > 999 without forcing a manual valuation doc.
+    if (billPrice > 999 && !isScrapVehicle) {
       // High-value items REQUIRE a manual valuation and document
       if (!isValuated || !valuationPrice)
         return NextResponse.json(
@@ -116,7 +121,7 @@ export async function POST(request: NextRequest) {
       finalValuationPrice = parseFloat(valuationPrice);
       finalEstimatedValue = finalValuationPrice;
     } else {
-      // Low-value items use algorithm unless user overrides
+      // Low-value items OR Scrap Vehicles use algorithm unless user overrides
       if (isValuated && valuationPrice) {
         finalValuationPrice = parseFloat(valuationPrice);
         finalEstimatedValue = finalValuationPrice;
@@ -131,7 +136,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Anti-Inflation Rule: Valuation cannot exceed original bill price (unless Antique/Scrap)
-    const isScrapVehicle = category === "Vehicles" && condition === "scrap";
     if (
       category !== "Antique" &&
       !isScrapVehicle &&
@@ -177,15 +181,7 @@ export async function POST(request: NextRequest) {
 // --- GET: Public Search & Filtering ---
 export async function GET(request: NextRequest) {
   try {
-    // 1. Lazy Auto-Approval Logic
-    // Automatically approve any pending listing created more than 48 hours ago
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    await prisma.listing.updateMany({
-      where: { isApproved: false, createdAt: { lt: fortyEightHoursAgo } },
-      data: { isApproved: true, approvedAt: new Date() },
-    });
-
-    // 2. Parse Query Parameters
+    // 1. Parse Query Parameters
     const { searchParams } = new URL(request.url);
 
     const page = parseInt(searchParams.get("page") || "1");
@@ -200,7 +196,7 @@ export async function GET(request: NextRequest) {
     const maxPrice = searchParams.get("maxPrice");
     const sort = searchParams.get("sort");
 
-    // 3. Build Dynamic Query
+    // 2. Build Dynamic Query
     const whereClause: any = {
       // Only show approved content to public
       isApproved: true,
@@ -223,14 +219,14 @@ export async function GET(request: NextRequest) {
       if (maxPrice) whereClause.estimatedValue.lte = parseFloat(maxPrice);
     }
 
-    // 4. Determine Sorting
+    // 3. Determine Sorting
     let orderBy: any = { createdAt: "desc" };
     if (sort === "price_asc") orderBy = { estimatedValue: "asc" };
     if (sort === "price_desc") orderBy = { estimatedValue: "desc" };
     if (sort === "date_asc") orderBy = { createdAt: "asc" };
     if (sort === "date_desc") orderBy = { createdAt: "desc" };
 
-    // 5. Fetch Data & Count (Transaction for consistency)
+    // 4. Fetch Data & Count (Transaction for consistency)
     const [listings, totalCount] = await prisma.$transaction([
       prisma.listing.findMany({
         where: whereClause,

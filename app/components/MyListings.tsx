@@ -25,7 +25,7 @@ export default function MyListings() {
       try {
         // 2. Fetch Data: Cookies are sent automatically by the browser
         // Points to app/api/listings/user/route.ts
-        const res = await fetch("/api/listings/user", {
+        const res = await fetch("/api/listings/mine", {
           method: "GET",
         });
 

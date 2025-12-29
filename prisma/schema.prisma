@@ -61,6 +61,8 @@ model User {
   reportsMade      Report[]   @relation("Reporter")
   reportsReceived  Report[]   @relation("ReportedUser")
 
+  receivedListings Listing[] @relation("ReceivedDonations")
+
   @@map("users") // Takes this model and names the actual DB table "users"
 }
 
@@ -106,11 +108,15 @@ model Listing {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  donatedAt DateTime? 
 
   isApproved      Boolean   @default(false) // Pending by default
   approvedAt      DateTime? 
 
   reports         Report[]
+
+  recipientId String?  // Add this field
+  recipient   User?    @relation("ReceivedDonations", fields: [recipientId], references: [id])
 
   @@map("listings")
 }

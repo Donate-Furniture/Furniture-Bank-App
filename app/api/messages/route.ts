@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { senderId } = body;
+    const { senderId, listingId } = body; // ✅ Added listingId support
 
     if (!senderId)
       return NextResponse.json(
@@ -53,13 +53,26 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
 
-    // Update all unread messages from this specific sender for the current user
+    // Build query to update only relevant messages
+    const whereClause: any = {
+      senderId: senderId,
+      recipientId: userId,
+      read: false,
+    };
+
+    // ✅ FIX: Strict separation logic.
+    // If listingId is provided, only mark those specific messages as read.
+    // If NOT provided, mark only the "General" chat (null) as read.
+    // This prevents clearing notifications for Item A when reading Item B.
+    if (listingId) {
+      whereClause.listingId = listingId;
+    } else {
+      whereClause.listingId = null;
+    }
+
+    // Update unread messages
     await prisma.message.updateMany({
-      where: {
-        senderId: senderId,
-        recipientId: userId,
-        read: false,
-      },
+      where: whereClause,
       data: { read: true },
     });
 
@@ -79,6 +92,7 @@ export async function GET(request: NextRequest) {
   const userId = (session.user as any).id;
   const { searchParams } = new URL(request.url);
   const otherUserId = searchParams.get("userId");
+  const listingIdParam = searchParams.get("listingId"); // ✅ Added param
   const getUnreadCount = searchParams.get("unreadCount");
 
   try {
@@ -92,13 +106,25 @@ export async function GET(request: NextRequest) {
 
     // MODE B: Fetch Specific Conversation History
     if (otherUserId) {
+      const whereClause: any = {
+        OR: [
+          { senderId: userId, recipientId: otherUserId },
+          { senderId: otherUserId, recipientId: userId },
+        ],
+      };
+
+      // ✅ FIX: Strict separation is required to prevent merging.
+      // If listingId is passed, we show that item's chat.
+      // If listingId is NOT passed (or is 'null'), we show the 'General' chat (listingId: null).
+      // We do NOT return 'all' messages anymore, as that causes the merging issue.
+      if (listingIdParam && listingIdParam !== 'undefined' && listingIdParam !== 'null') {
+        whereClause.listingId = listingIdParam;
+      } else {
+        whereClause.listingId = null; 
+      }
+
       const messages = await prisma.message.findMany({
-        where: {
-          OR: [
-            { senderId: userId, recipientId: otherUserId },
-            { senderId: otherUserId, recipientId: userId },
-          ],
-        },
+        where: whereClause,
         orderBy: { createdAt: "asc" }, // Oldest first for chat bubbles
         include: {
           sender: { select: { firstName: true, lastName: true } },
@@ -129,25 +155,29 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // 2. Group by "Other User" to create distinct conversation threads
+    // 2. Group by "Other User" AND "Listing" to create distinct conversation threads
     const conversationsMap = new Map();
 
     messages.forEach((msg) => {
       const otherUser = msg.senderId === userId ? msg.recipient : msg.sender;
+      
+      // ✅ FIX: Create composite key so User A + Item A is distinct from User A + Item B
+      const listingKey = msg.listingId || 'general';
+      const conversationKey = `${otherUser.id}_${listingKey}`;
 
-      // Since messages are sorted desc, the first time we see a user, it's the latest message
-      if (!conversationsMap.has(otherUser.id)) {
+      // Since messages are sorted desc, the first time we see this key, it's the latest message
+      if (!conversationsMap.has(conversationKey)) {
         // Determine if this specific thread is unread
         const isUnread = msg.recipientId === userId && !msg.read;
 
-        conversationsMap.set(otherUser.id, {
+        conversationsMap.set(conversationKey, {
           user: otherUser,
           lastMessage: msg.content,
           date: msg.createdAt,
           isUnread: isUnread,
 
-          listingId: msg.listing?.id,
-          listingTitle: msg.listing?.title,
+          listingId: msg.listing?.id || null,
+          listingTitle: msg.listing?.title || (msg.listingId ? "Unknown Listing" : "General"),
           listingImage: msg.listing?.imageUrls?.[0] || null,
         });
       }
