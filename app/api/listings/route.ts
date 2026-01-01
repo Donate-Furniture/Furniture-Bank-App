@@ -4,7 +4,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 // --- HELPER: Pricing Algorithm ---
 // Calculates current value based on depreciation rules (60% after 1 year, 50% after 2, 34% after 3+)

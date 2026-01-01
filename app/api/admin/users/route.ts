@@ -4,7 +4,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 import { hashPassword } from "@/lib/auth";
 
 // Ensure the admin table always shows the latest user data

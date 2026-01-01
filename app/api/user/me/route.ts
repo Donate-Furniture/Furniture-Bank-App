@@ -3,7 +3,7 @@
 
 import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/route'; 
+import { authOptions } from "@/lib/auth";
 import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth'; // Ensure this is exported from lib/auth
 import * as bcrypt from 'bcryptjs';
