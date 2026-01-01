@@ -64,6 +64,10 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         // @ts-ignore
         token.role = user.role;
+        // @ts-ignore
+        token.firstName = user.firstName;
+        // @ts-ignore
+        token.lastName = user.lastName;
       }
       return token;
     },
@@ -73,6 +77,10 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         // @ts-ignore
         session.user.role = token.role as string;
+        // @ts-ignore
+        session.user.firstName = token.firstName as string;
+        // @ts-ignore
+        session.user.lastName = token.lastName as string;
       }
       return session;
     },
