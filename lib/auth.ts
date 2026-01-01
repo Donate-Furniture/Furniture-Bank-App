@@ -3,40 +3,56 @@ import * as bcrypt from "bcryptjs";
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "@/lib/prisma";
-
-// --- Password Utilities ---
-
-/**
- * Hashes a plain-text password for secure storage.
- * Used during Registration.
- */
-export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-}
-
-// Note: comparePassword is technically not needed here anymore
-// because NextAuth handles comparison inside the [...nextauth] route,
-// but keeping it doesn't hurt.
-export async function comparePassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    // 1. Google Login
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
+    // 2. Facebook Login
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID || "",
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || "",
+    }),
+    // 3. Email/Password Login (Restored)
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Invalid credentials");
+        }
+
+        const user = await prisma.user.findUnique({
+          where: {
+            email: credentials.email,
+          },
+        });
+
+        if (!user || !user.password) {
+          throw new Error("Invalid credentials");
+        }
+
+        const isCorrectPassword = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isCorrectPassword) {
+          throw new Error("Invalid credentials");
+        }
+
+        return user;
+      },
     }),
   ],
   session: {
@@ -62,4 +78,41 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 };
+
+/**
+
+ * Hashes a plain-text password for secure storage.
+
+ * Used during Registration.
+
+ */
+
+export async function hashPassword(password: string): Promise<string> {
+
+  const salt = await bcrypt.genSalt(10);
+
+  return bcrypt.hash(password, salt);
+
+}
+
+
+
+// Note: comparePassword is technically not needed here anymore
+
+// because NextAuth handles comparison inside the [...nextauth] route,
+
+// but keeping it doesn't hurt.
+
+export async function comparePassword(
+
+  password: string,
+
+  hash: string
+
+): Promise<boolean> {
+
+  return bcrypt.compare(password, hash);
+
+}
